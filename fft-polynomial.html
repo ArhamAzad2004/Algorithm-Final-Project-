@@ -983,7 +983,7 @@ function drawCircle(activeIndices, n, phase) {
   const color = phase==='fft'?'var(--phase1)':phase==='mult'?'var(--phase2)':phase==='ifft'?'var(--phase3)':'var(--accent)';
 
   for (let k=0; k<n; k++) {
-    const angle = -2*Math.PI*k/n - Math.PI/2;
+    const angle = -2*Math.PI*k/n;
     const px = cx + r*Math.cos(angle);
     const py = cy + r*Math.sin(angle);
     const isActive = activeIndices.includes(k);
