@@ -262,23 +262,6 @@ body{
 }
 .reset-link:hover{color:var(--red);}
 
-/* CHECKLIST */
-.checklist{display:flex;flex-direction:column;gap:8px;}
-.check-row{
-  display:flex;align-items:center;gap:10px;
-  padding:8px 12px;background:var(--bg3);border:1px solid var(--border);
-  border-radius:8px;font-size:13px;color:var(--text2);
-  transition:all .25s;
-}
-.check-row.ok{border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.05);color:var(--text);}
-.check-icon{
-  width:22px;height:22px;border-radius:50%;
-  background:var(--bg4);border:1.5px solid var(--border);
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:700;color:var(--text2);flex-shrink:0;
-}
-.check-row.ok .check-icon{background:var(--green);border-color:var(--green);color:#fff;}
-
 /* SHORTCUTS CARD */
 .shortcuts{
   background:var(--bg3);border:1px solid var(--border);
@@ -291,9 +274,6 @@ body{
   font-family:'Courier New',monospace;font-size:11px;
   padding:2px 7px;color:var(--text);min-width:22px;text-align:center;
 }
-
-/* TWO-COL META */
-.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
 
 /* FOOTER */
 .footer{margin-top:20px;text-align:center;color:var(--text2);font-size:12px;}
@@ -372,8 +352,7 @@ body{
 @media(max-width:980px){
   .grid{grid-template-columns:1fr;}
   .stats{grid-template-columns:repeat(2,1fr);}
-  .meta-grid{grid-template-columns:1fr;}
-  .hero h1{font-size:24px;}
+.hero h1{font-size:24px;}
   .bar-row{grid-template-columns:1fr;gap:4px;}
   .bar-val{text-align:left;}
 }
@@ -436,7 +415,6 @@ body{
   <div class="cta-row">
     <button class="btn primary" onclick="startTour()">▶ Quick tour <span class="kbd">T</span></button>
     <button class="btn" onclick="openAllTools()">🗂 Open all 4 tools</button>
-    <button class="btn" onclick="copyRepoUrl()">🔗 Copy GitHub Pages URL</button>
     <button class="btn ghost" onclick="showShortcuts()">⌨ Shortcuts <span class="kbd">?</span></button>
   </div>
 
@@ -672,49 +650,6 @@ body{
   </div>
 </section>
 
-<!-- ════════════ SUBMISSION META ════════════ -->
-<section class="section" id="submission">
-  <h2>Submission Quality Checks <span class="sub">live status — these update as you interact with the page</span></h2>
-
-  <div class="meta-grid">
-    <div class="checklist">
-      <div class="check-row ok" id="chk-links">
-        <span class="check-icon">✓</span>
-        <div>All four CLO pages reachable from this index</div>
-      </div>
-      <div class="check-row ok" id="chk-offline">
-        <span class="check-icon">✓</span>
-        <div>Standalone HTML — no external libraries, fonts, or network requests</div>
-      </div>
-      <div class="check-row" id="chk-responsive">
-        <span class="check-icon">·</span>
-        <div>Responsive at ≤980 px <span style="color:var(--text3);font-size:11px" id="chk-resp-detail">(resize the window or load on phone)</span></div>
-      </div>
-      <div class="check-row" id="chk-motion">
-        <span class="check-icon">·</span>
-        <div>Reduced-motion respected <span style="color:var(--text3);font-size:11px">(toggle in OS or DevTools)</span></div>
-      </div>
-      <div class="check-row ok">
-        <span class="check-icon">✓</span>
-        <div>Each tool ships pseudocode, key concepts, worked example, and lecture notes</div>
-      </div>
-    </div>
-
-    <div class="shortcuts">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text)">Keyboard shortcuts</div>
-      <div class="shortcut-row"><kbd>1</kbd>–<kbd>4</kbd> Open the matching CLO tool</div>
-      <div class="shortcut-row"><kbd>T</kbd> Quick tour through the page</div>
-      <div class="shortcut-row"><kbd>?</kbd> Show this shortcuts panel</div>
-      <div class="shortcut-row"><kbd>R</kbd> Reset learning-path progress</div>
-      <div class="shortcut-row"><kbd>Esc</kbd> Close any popup</div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">Hosted version</div>
-        <div style="font-size:12px;color:var(--text2);font-family:'Courier New',monospace;word-break:break-all" id="repoUrl">https://arhamazad2004.github.io/Algorithm-Final-Project-/</div>
-        <button class="btn" style="margin-top:8px;padding:6px 10px;font-size:12px" onclick="copyRepoUrl()">Copy URL</button>
-      </div>
-    </div>
-  </div>
-</section>
 
 <div class="footer">
   Repository: <a href="https://github.com/ArhamAzad2004/Algorithm-Final-Project-" target="_blank" rel="noopener noreferrer">ArhamAzad2004/Algorithm-Final-Project-</a>
@@ -755,32 +690,6 @@ body{
 <div class="tour-tip" id="tourTip"></div>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// REDUCED-MOTION + RESPONSIVE DETECTION
-// ═══════════════════════════════════════════════════════
-const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-const responsiveQ = window.matchMedia('(max-width: 980px)');
-
-function updateLiveChecks(){
-  const motionOk = reduceMotion && reduceMotion.matches;
-  setCheck('chk-motion', motionOk, motionOk
-    ? 'Reduced motion is currently active — animations disabled'
-    : 'Reduced-motion respected (toggle in OS or DevTools to verify)');
-  const respOk = responsiveQ.matches;
-  setCheck('chk-responsive', respOk, respOk
-    ? 'Mobile layout active — single column, stats halved'
-    : 'Responsive at ≤980 px (resize the window or load on phone)');
-}
-function setCheck(id, ok, text){
-  const row = document.getElementById(id);
-  if(!row) return;
-  row.classList.toggle('ok', ok);
-  row.querySelector('.check-icon').textContent = ok ? '✓' : '·';
-  if(text) row.querySelector('div:last-child').innerHTML = text.replace(/^([^(]+)/, '$1 ');
-}
-if(reduceMotion && reduceMotion.addEventListener) reduceMotion.addEventListener('change', updateLiveChecks);
-if(responsiveQ && responsiveQ.addEventListener) responsiveQ.addEventListener('change', updateLiveChecks);
-window.addEventListener('resize', updateLiveChecks);
 
 // ═══════════════════════════════════════════════════════
 // MILLER-RABIN MINI-TESTER
@@ -1121,18 +1030,6 @@ function openAllTools(){
   modal.classList.add('show');
 }
 function hideAllTools(){ document.getElementById('allToolsModal').classList.remove('show'); }
-function copyRepoUrl(){
-  const url = document.getElementById('repoUrl').textContent.trim();
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(() => showToast('URL copied to clipboard'));
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = url; document.body.appendChild(ta); ta.select();
-    try{ document.execCommand('copy'); showToast('URL copied'); }
-    catch{ showToast('Could not copy — select manually'); }
-    document.body.removeChild(ta);
-  }
-}
 function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1162,7 +1059,6 @@ const TOUR_STEPS = [
   { sel: '#card-5 .mini', tip: '③ Click the canvas to place cities — Prim\'s MST and the approximate tour are drawn instantly.' },
   { sel: '#compare',    tip: '④ Comparison table + interactive complexity chart. Drag the n slider to see the gap explode.' },
   { sel: '#path',       tip: '⑤ Steps light up green as you visit each tool — a learning-path indicator powered by localStorage.' },
-  { sel: '#submission', tip: '⑥ Live submission-quality checks. Resize the window or toggle reduced-motion to flip the lights green.' },
 ];
 let tourIdx = -1, tourActive = false;
 function startTour(){
