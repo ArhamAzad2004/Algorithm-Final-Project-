@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rabin-Karp String Matching — BSD 404 CLO-4</title>
+<style>
+:root {
+  --bg:#0f1117; --bg2:#161b25; --bg3:#1e2535; --bg4:#252d3e;
+  --border:#2e3a50; --text:#e2e8f0; --text2:#94a3b8; --text3:#64748b;
+  --accent:#3b82f6; --green:#22c55e; --orange:#f97316; --purple:#a855f7;
+  --yellow:#eab308; --red:#ef4444; --teal:#14b8a6; --pink:#ec4899;
+  --window:#3b82f6; --spurious:#f97316; --match:#22c55e; --processed:#334155;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:10;}
+.header-title{font-size:18px;font-weight:700;}
+.header-sub{font-size:12px;color:var(--text2);}
+.clo-badge{background:var(--teal);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+.main{display:flex;min-height:calc(100vh - 56px);}
+.panel-left{width:420px;min-width:420px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;}
+.panel-right{flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;}
+input[type=text]{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s;font-family:monospace;}
+input[type=text]:focus{border-color:var(--accent);}
+input.valid{border-color:var(--green);}
+input.invalid{border-color:var(--red);}
+.input-hint{font-size:11px;color:var(--text3);margin-top:3px;}
+.preset-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.btn-preset{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.btn-preset:hover{background:var(--bg3);border-color:var(--accent);color:var(--text);}
+.speed-row{display:flex;align-items:center;gap:10px;}
+.speed-row span{font-size:12px;color:var(--text2);white-space:nowrap;}
+input[type=range]{flex:1;accent-color:var(--accent);}
+.speed-val{font-size:12px;color:var(--accent);font-weight:600;min-width:34px;text-align:right;}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-primary:hover{filter:brightness(1.1);}
+.btn-secondary{background:var(--bg4);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--bg3);border-color:var(--teal);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:2px;}
+.stat-val{font-size:16px;font-weight:700;}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;}
+.status-idle{background:#1e2535;color:var(--text2);}
+.status-ready{background:#1a2e1a;color:var(--green);}
+.status-playing{background:#1a2040;color:var(--accent);}
+.status-paused{background:#2a2010;color:var(--yellow);}
+.status-done{background:#1a2e2a;color:var(--teal);}
+
+/* CHAR BOXES */
+.str-row{display:flex;flex-wrap:wrap;gap:3px;align-items:flex-end;}
+.char-box{width:36px;height:44px;border-radius:6px;border:1.5px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;font-weight:700;font-size:15px;transition:all .25s;flex-shrink:0;position:relative;}
+.char-idx{font-size:9px;color:var(--text3);font-weight:400;position:absolute;bottom:2px;font-family:sans-serif;}
+.ch-normal{background:var(--bg4);color:var(--text2);}
+.ch-window{background:rgba(59,130,246,.15);border-color:var(--window);color:var(--text);}
+.ch-checking{background:rgba(59,130,246,.3);border-color:var(--window);color:#fff;}
+.ch-spurious{background:rgba(249,115,22,.15);border-color:var(--spurious);color:var(--orange);}
+.ch-match{background:rgba(34,197,94,.2);border-color:var(--match);color:var(--green);}
+.ch-processed{background:var(--bg);border-color:var(--border);color:var(--text3);}
+
+/* HASH DISPLAY */
+.hash-display{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.hash-box{background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;min-width:120px;}
+.hash-box-label{font-size:11px;color:var(--text3);margin-bottom:4px;}
+.hash-box-val{font-size:18px;font-weight:700;font-family:monospace;}
+.hash-match{border-color:var(--orange);background:rgba(249,115,22,.08);}
+.hash-match .hash-box-val{color:var(--orange);}
+.hash-real{border-color:var(--green);background:rgba(34,197,94,.08);}
+.hash-real .hash-box-val{color:var(--green);}
+.hash-eq{font-size:22px;color:var(--text3);font-weight:700;}
+.hash-neq{font-size:22px;color:var(--text3);font-weight:700;color:var(--red);}
+
+/* ROLLING HASH FORMULA */
+.formula-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-family:monospace;font-size:13px;color:var(--teal);}
+
+/* PSEUDO */
+.pseudo-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow-y:auto;max-height:320px;}
+.pseudo-line{display:flex;align-items:flex-start;padding:3px 10px;font-family:'Courier New',monospace;font-size:12px;color:var(--text2);cursor:pointer;position:relative;transition:background .15s;}
+.pseudo-line:hover{background:var(--bg3);}
+.pseudo-line.active{background:rgba(20,184,166,.2);color:var(--text);border-left:3px solid var(--teal);}
+.pseudo-num{color:var(--text3);min-width:22px;margin-right:8px;user-select:none;font-size:11px;padding-top:1px;}
+.pseudo-code{flex:1;white-space:pre;}
+.pseudo-line .tooltip{display:none;position:absolute;left:100%;top:0;z-index:99;background:#1a1a2e;border:1px solid var(--teal);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);min-width:200px;max-width:300px;white-space:normal;pointer-events:none;}
+.pseudo-line:hover .tooltip{display:block;}
+
+/* KEY CONCEPT */
+.key-concept{border-left:3px solid var(--yellow);background:rgba(234,179,8,.07);padding:10px 14px;border-radius:0 6px 6px 0;margin:8px 0;}
+.key-concept-title{font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:4px;}
+.key-concept p{font-size:12px;color:var(--text2);}
+
+/* STEP EXPLAIN */
+.step-explain{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:12px;min-height:64px;font-size:13px;color:var(--text);line-height:1.6;}
+.phase-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-bottom:6px;}
+.ph-hash{background:rgba(59,130,246,.2);color:var(--accent);}
+.ph-slide{background:rgba(20,184,166,.2);color:var(--teal);}
+.ph-spurious{background:rgba(249,115,22,.2);color:var(--orange);}
+.ph-match{background:rgba(34,197,94,.2);color:var(--green);}
+.ph-init{background:rgba(168,85,247,.2);color:var(--purple);}
+
+/* HISTORY */
+.history-table-wrap{max-height:200px;overflow-y:auto;border-radius:6px;border:1px solid var(--border);}
+.history-table{width:100%;border-collapse:collapse;font-size:12px;}
+.history-table th{background:var(--bg4);color:var(--text2);font-weight:600;padding:6px 8px;text-align:left;position:sticky;top:0;font-size:11px;border-bottom:1px solid var(--border);}
+.history-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.5);color:var(--text2);}
+.history-table tr:hover td{background:var(--bg4);color:var(--text);cursor:pointer;}
+.history-table tr.current-row td{background:rgba(20,184,166,.15);color:var(--text);}
+
+/* COMPARE TABLE */
+.compare-table{width:100%;border-collapse:collapse;font-size:12px;}
+.compare-table th{background:var(--bg4);padding:7px 10px;color:var(--text2);font-weight:600;text-align:left;border-bottom:1px solid var(--border);}
+.compare-table td{padding:6px 10px;border-bottom:1px solid rgba(46,58,80,.4);color:var(--text2);}
+.compare-table tr:nth-child(even) td{background:rgba(30,37,53,.4);}
+
+/* WORKED EXAMPLE TABLE */
+.worked-table{width:100%;border-collapse:collapse;font-size:12px;}
+.worked-table th{background:var(--bg4);padding:6px 8px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);text-align:left;}
+.worked-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.4);color:var(--text2);font-family:monospace;}
+.worked-table tr.spurious td{color:var(--orange);}
+.worked-table tr.match td{color:var(--green);font-weight:600;}
+
+/* COLLAPSIBLE */
+.collapsible-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;user-select:none;}
+.collapsible-header h3{font-size:13px;font-weight:600;color:var(--text);}
+.collapsible-arrow{color:var(--text3);font-size:11px;transition:transform .2s;}
+.collapsible-arrow.open{transform:rotate(180deg);}
+.collapsible-body{transition:max-height .3s ease;}
+.section-text{font-size:13px;color:var(--text2);line-height:1.7;}
+.section-text p{margin-bottom:8px;}
+
+/* LECTURE */
+.lecture-section{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;}
+.lecture-h3{font-size:14px;font-weight:700;color:var(--text);margin:14px 0 6px;}
+.lecture-code{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:12px;color:#7dd3fc;overflow-x:auto;white-space:pre;margin:8px 0;line-height:1.7;}
+
+/* MATCH RESULTS */
+.match-tag{display:inline-block;background:rgba(34,197,94,.15);border:1px solid var(--green);border-radius:12px;padding:2px 10px;font-size:12px;color:var(--green);font-family:monospace;margin:3px;}
+.spurious-tag{display:inline-block;background:rgba(249,115,22,.15);border:1px solid var(--orange);border-radius:12px;padding:2px 10px;font-size:12px;color:var(--orange);font-family:monospace;margin:3px;}
+
+/* RESULT BOX */
+.result-box{background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:14px;}
+.notice{font-size:11px;color:var(--text3);background:var(--bg4);padding:6px 10px;border-radius:5px;border-left:2px solid var(--text3);}
+
+@keyframes pulseGlow{
+  0%{box-shadow:0 0 0 rgba(20,184,166,0);transform:translateY(0);}
+  50%{box-shadow:0 0 0 6px rgba(20,184,166,.15);transform:translateY(-1px);}
+  100%{box-shadow:0 0 0 rgba(20,184,166,0);transform:translateY(0);}
+}
+
+@keyframes fadeFlash{
+  0%{background:rgba(20,184,166,.28);}
+  100%{background:transparent;}
+}
+
+.motion-pulse{animation:pulseGlow .45s ease;}
+.motion-flash{animation:fadeFlash .5s ease;}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation:none !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
+@media(max-width:980px){.main{flex-direction:column;}.panel-left{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Rabin-Karp String Matching</div>
+    <div class="header-sub">BSD 404 — Algorithms II &nbsp;|&nbsp; Dr. Arash Kermani &nbsp;|&nbsp; Interactive Teaching Tool</div>
+  </div>
+  <span class="clo-badge">CLO-4</span>
+</div>
+
+<div class="main">
+<!-- ═══ LEFT PANEL ═══ -->
+<div class="panel-left">
+
+  <div class="card">
+    <div class="card-title">Input</div>
+    <div style="margin-bottom:10px">
+      <label>Text T (the string to search in)</label>
+      <input type="text" id="inputT" value="ABCABCABD" placeholder="Text string">
+      <div class="input-hint" id="hintT">Length: 9</div>
+    </div>
+    <div>
+      <label>Pattern P (what to search for)</label>
+      <input type="text" id="inputP" value="ABD" placeholder="Pattern">
+      <div class="input-hint" id="hintP">Length: 3</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <div>
+        <label>Base d</label>
+        <select id="inputD" style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:7px 8px;color:var(--text);font-size:12px;width:100%;outline:none;">
+          <option value="26">26 (alpha)</option>
+          <option value="256" selected>256 (ASCII)</option>
+        </select>
+      </div>
+      <div>
+        <label>Prime q</label>
+        <select id="inputQ" style="background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:7px 8px;color:var(--text);font-size:12px;width:100%;outline:none;">
+          <option value="101" selected>101</option>
+          <option value="31">31</option>
+          <option value="1000003">1000003</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Quick Examples</div>
+    <div class="preset-grid">
+      <button class="btn-preset" onclick="loadPreset(0)">Basic match</button>
+      <button class="btn-preset" onclick="loadPreset(1)">Spurious hit demo ⚠</button>
+      <button class="btn-preset" onclick="loadPreset(2)">Multiple matches</button>
+      <button class="btn-preset" onclick="loadPreset(3)">No match</button>
+      <button class="btn-preset" onclick="loadPreset(4)">Overlapping matches</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Speed</div>
+    <div class="speed-row">
+      <span>0.25×</span>
+      <input type="range" id="speedSlider" min="0" max="4" step="1" value="2" oninput="updateSpeed()">
+      <span>4×</span>
+      <span class="speed-val" id="speedLabel">1.0×</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Controls</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnBuild" onclick="buildSteps()">Build Steps</button>
+      <button class="btn btn-secondary" id="btnStep" onclick="stepForward()" disabled>Step</button>
+      <button class="btn btn-secondary" id="btnPlay" onclick="startPlay()" disabled>Play</button>
+      <button class="btn btn-secondary" id="btnPause" onclick="pausePlay()" disabled>Pause</button>
+      <button class="btn btn-secondary" id="btnReset" onclick="resetAll()" disabled>Reset</button>
+    </div>
+    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:13px;color:var(--text2)">Step <span id="stepCurrent" style="color:var(--text);font-weight:700">0</span> / <span id="stepTotal">0</span></div>
+      <span class="status-badge status-idle" id="statusBadge">Idle</span>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Try <strong>Spurious hit demo</strong> to see a false hash match that fails character verification.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Live Counters</div>
+    <div class="status-grid">
+      <div class="stat-box"><div class="stat-label">Hash Comparisons</div><div class="stat-val" style="color:var(--teal)" id="cntHash">0</div></div>
+      <div class="stat-box"><div class="stat-label">Char Verifications</div><div class="stat-val" style="color:var(--accent)" id="cntChar">0</div></div>
+      <div class="stat-box"><div class="stat-label">Spurious Hits</div><div class="stat-val" style="color:var(--orange)" id="cntSpurious">0</div></div>
+      <div class="stat-box"><div class="stat-label">Real Matches</div><div class="stat-val" style="color:var(--green)" id="cntMatch">0</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Pseudocode <span style="font-size:10px;color:var(--text3)">(hover for tooltip)</span></div>
+    <div class="pseudo-block" id="pseudoBlock"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step Explanation</div>
+    <div class="step-explain" id="stepExplain"><span style="color:var(--text3)">🎓 Click <strong>Build Steps</strong>, then <strong>Step</strong> or <strong>Play</strong> to trace the rolling hash window-by-window.</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step History <span style="font-size:10px;color:var(--text3)">(click row to jump)</span></div>
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead><tr><th>#</th><th>Type</th><th>Window</th><th>Detail</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end left -->
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div class="panel-right">
+
+  <!-- LEGEND -->
+  <div class="card">
+    <div class="card-title">Legend</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><div style="width:12px;height:12px;border-radius:3px;background:rgba(59,130,246,.3);border:1.5px solid var(--window)"></div>Current window</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><div style="width:12px;height:12px;border-radius:3px;background:rgba(249,115,22,.2);border:1.5px solid var(--spurious)"></div>Spurious hit</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><div style="width:12px;height:12px;border-radius:3px;background:rgba(34,197,94,.2);border:1.5px solid var(--match)"></div>Real match</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><div style="width:12px;height:12px;border-radius:3px;background:var(--bg);border:1.5px solid var(--border)"></div>Processed</div>
+    </div>
+  </div>
+
+  <!-- TEXT VISUALIZATION -->
+  <div class="card">
+    <div class="card-title">Text T — Sliding Window</div>
+    <div class="str-row" id="textRow" style="margin-bottom:12px"></div>
+    <div style="margin-top:6px;font-size:12px;color:var(--text2)">Pattern P:</div>
+    <div class="str-row" id="patRow" style="margin-top:4px"></div>
+  </div>
+
+  <!-- HASH PANEL -->
+  <div class="card">
+    <div class="card-title">Hash Values — Current Window</div>
+    <div class="hash-display" id="hashDisplay">
+      <div class="hash-box" id="hashP"><div class="hash-box-label">hash(P)</div><div class="hash-box-val" id="hashPVal">—</div></div>
+      <div id="hashEqSign" class="hash-eq">=?</div>
+      <div class="hash-box" id="hashW"><div class="hash-box-label">hash(window)</div><div class="hash-box-val" id="hashWVal">—</div></div>
+    </div>
+    <div style="margin-top:10px" id="hashVerifyRow"></div>
+
+    <!-- ROLLING HASH FORMULA -->
+    <div style="margin-top:12px">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:6px;">Rolling hash update formula (O(1) per slide):</div>
+      <div class="formula-box" id="rollingFormula">hash_new = (d × (hash_old − T[i] × h) + T[i+m]) mod q<br>where h = d^(m-1) mod q (precomputed)</div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="resultBox" style="display:none" class="result-box"></div>
+
+  <!-- MATCHES & SPURIOUS -->
+  <div class="card">
+    <div class="card-title">Matches Found &amp; Spurious Hits</div>
+    <div id="matchesWrap" style="font-size:12px;color:var(--text3)">Run the algorithm to see results.</div>
+  </div>
+
+  <!-- WORKED EXAMPLE -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('worked')">
+      <h3>📐 Fully Worked Example: P="ABD" in T="ABCABCABD"</h3>
+      <span class="collapsible-arrow" id="arrow-worked">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-worked" style="max-height:0;overflow:hidden">
+      <div style="padding-top:10px">
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Setup: d=256, q=101, m=3</div>
+          <p>h = d^(m-1) mod q = 256^2 mod 101 = 65536 mod 101 = 67.<br>hash(P) = hash("ABD") = (65×256² + 66×256 + 68) mod 101.</p>
+        </div>
+        <table class="worked-table" style="margin-top:10px">
+          <thead><tr><th>Pos</th><th>Window</th><th>hash(window)</th><th>= hash(P)?</th><th>Verify</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>0</td><td>"ABC"</td><td>4</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr><td>1</td><td>"BCA"</td><td>17</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr><td>2</td><td>"CAB"</td><td>88</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr><td>3</td><td>"ABC"</td><td>4</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr><td>4</td><td>"BCA"</td><td>17</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr><td>5</td><td>"CAB"</td><td>88</td><td>No</td><td>—</td><td>Move on</td></tr>
+            <tr class="match"><td>6</td><td>"ABD"</td><td>hash(P)</td><td>Yes!</td><td>A=A,B=B,D=D ✓</td><td>MATCH at pos 6</td></tr>
+          </tbody>
+        </table>
+        <div class="key-concept" style="margin-top:10px;border-left-color:var(--teal);background:rgba(20,184,166,.07)">
+          <div class="key-concept-title" style="color:var(--teal)">🔑 Rolling Hash at step 1: "ABC" → "BCA"</div>
+          <p>Old hash = hash("ABC"). Remove A (65), slide in A (65):<br>
+          new_hash = (256 × (old_hash − 65 × 67) + 65) mod 101<br>
+          = (256 × (old_hash − 4355) + 65) mod 101 = 17. Constant time — no recomputation!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY CONCEPTS -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('concepts')">
+      <h3>💡 Key Concepts</h3>
+      <span class="collapsible-arrow open" id="arrow-concepts">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-concepts" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Rolling Hash — O(1) per window slide</div>
+          <p>Instead of recomputing the hash of each window from scratch (O(m)), we update it in O(1): remove the contribution of the outgoing character and add the incoming character. This is the core trick that makes Rabin-Karp efficient.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--orange);background:rgba(249,115,22,.07)">
+          <div class="key-concept-title" style="color:var(--orange)">🔑 Spurious Hit — a hash collision</div>
+          <p>When hash(window) = hash(pattern) but the actual characters are different. This is unavoidable with any finite modulus. We must always verify character-by-character on a hash match. Spurious hits add O(m) verification cost each.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--purple);background:rgba(168,85,247,.07)">
+          <div class="key-concept-title" style="color:var(--purple)">🔑 Why use a large prime q?</div>
+          <p>Mod a prime distributes hash values more uniformly. A larger prime means fewer collisions. With q=101, collisions happen ~1/101 times on average. With q=1000003, ~1/1000003 times. A power of 2 as modulus would be far worse.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--green);background:rgba(34,197,94,.07)">
+          <div class="key-concept-title" style="color:var(--green)">🔑 Expected O(|T| + |P|) time</div>
+          <p>|T|−|P|+1 hash comparisons at O(1) each = O(|T|). Initial hash computation = O(|P|). Verification only triggers on (rare) hash matches. Expected total = O(|T| + |P|). Worst case O(|T|×|P|) if every window is a spurious hit.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--teal);background:rgba(20,184,166,.07)">
+          <div class="key-concept-title" style="color:var(--teal)">🔑 Rabin-Karp vs KMP vs Naive</div>
+          <p>Naive: O(|T|×|P|) worst case, no preprocessing. KMP: O(|T|+|P|) guaranteed, O(|P|) preprocessing (failure table). Rabin-Karp: O(|T|+|P|) expected, O(|P|) preprocessing (hash). KMP is deterministic; Rabin-Karp is probabilistic but simpler to implement and extendable to 2D matching.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALGORITHM COMPARISON -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('compare')">
+      <h3>⚡ Algorithm Comparison: Rabin-Karp vs KMP vs Naive</h3>
+      <span class="collapsible-arrow open" id="arrow-compare">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-compare" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:10px">
+        <table class="compare-table">
+          <thead><tr><th>Property</th><th>Naive</th><th>KMP</th><th>Rabin-Karp</th></tr></thead>
+          <tbody>
+            <tr><td>Preprocessing</td><td>None</td><td>O(|P|) failure table</td><td>O(|P|) hash</td></tr>
+            <tr><td>Search time</td><td>O(|T|×|P|)</td><td>O(|T|) guaranteed</td><td>O(|T|+|P|) expected</td></tr>
+            <tr><td>Worst case</td><td>O(|T|×|P|)</td><td>O(|T|+|P|)</td><td>O(|T|×|P|)</td></tr>
+            <tr><td>Space</td><td>O(1)</td><td>O(|P|)</td><td>O(1)</td></tr>
+            <tr><td>False positives?</td><td>No</td><td>No</td><td>Yes (spurious hits)</td></tr>
+            <tr><td>2D matching</td><td>Complex</td><td>Complex</td><td>Easy extension</td></tr>
+            <tr><td>Implementation</td><td>Simple</td><td>Complex</td><td>Moderate</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:10px" id="liveCompare">
+          <div style="font-size:12px;color:var(--text2)">Run the algorithm to see live operation counts vs naive and KMP estimates.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LECTURE NOTES -->
+  <div class="lecture-section">
+    <div class="collapsible-header" onclick="toggleCollapse('lecture')">
+      <h2>📖 Lecture Notes — Rabin-Karp String Matching</h2>
+      <span class="collapsible-arrow" id="arrow-lecture">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-lecture" style="max-height:0;overflow:hidden">
+      <div style="padding-top:12px">
+
+        <div class="lecture-h3">1. The String Matching Problem</div>
+        <p class="section-text">Given text T (length n) and pattern P (length m), find all positions i where T[i..i+m−1] = P. Applications: text editors (Ctrl+F), bioinformatics (DNA search), network intrusion detection, plagiarism detection.</p>
+
+        <div class="lecture-h3">2. Why Rolling Hash?</div>
+        <p class="section-text">Naïve comparison rechecks every character in every window — O(n×m). The key insight: if we could compare windows in O(1), the total becomes O(n). Hashing achieves this — but we can't afford to recompute the hash from scratch each time. Rolling hash reuses the previous window's hash, updating in O(1).</p>
+
+        <div class="lecture-h3">3. The Hash Formula</div>
+        <div class="lecture-code">hash(S[0..m-1]) = (S[0]×d^(m-1) + S[1]×d^(m-2) + … + S[m-1]) mod q
+
+// Precompute: h = d^(m-1) mod q
+
+// Rolling update — slide window right by 1:
+hash_new = (d × (hash_old - T[i] × h) + T[i+m]) mod q
+
+// Add q before mod to handle negative values:
+hash_new = (d × (hash_old - T[i] × h + q) + T[i+m]) mod q</div>
+
+        <div class="lecture-h3">4. Spurious Hits — Why We Must Verify</div>
+        <p class="section-text">Two different strings can have the same hash (collision). A spurious hit is when hash(window) = hash(P) but window ≠ P. When this happens, we do a full O(m) character-by-character check. The key: spurious hits are rare with good q, so expected total work is still O(n+m).</p>
+
+        <div class="lecture-h3">5. Full Algorithm</div>
+        <div class="lecture-code">RABIN-KARP(T, P, d, q):
+  n = len(T); m = len(P)
+  h = d^(m-1) mod q           // high-order coefficient
+  pHash = 0; wHash = 0
+  for i = 0 to m-1:           // compute initial hashes
+    pHash = (d*pHash + P[i]) mod q
+    wHash = (d*wHash + T[i]) mod q
+  for i = 0 to n-m:           // slide window
+    if pHash == wHash:         // hash match
+      if T[i..i+m-1] == P:    // verify characters
+        report match at i
+    if i < n-m:                // roll hash
+      wHash = (d*(wHash - T[i]*h) + T[i+m]) mod q
+      wHash = (wHash + q) mod q  // handle negatives</div>
+
+        <div class="lecture-h3">6. Complexity Analysis</div>
+        <p class="section-text">Preprocessing: O(m) to compute initial hashes. Each slide: O(1) hash update. Each hash match: O(m) verification (rare). Expected total: <strong>O(n + m)</strong>. Worst case (all windows hash-match): O(nm). With large prime q, collisions are rare so expected case dominates in practice.</p>
+
+        <div class="lecture-h3">7. Choosing d and q</div>
+        <p class="section-text">d = alphabet size (26 for lowercase letters, 256 for ASCII). q = a large prime (101, 1009, 1000003). The probability of a spurious hit at any position is approximately 1/q. With q=101 and a text of length 1000, expect about 10 spurious hits. With q=1000003, expect about 0.001 — essentially none.</p>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- end right -->
+</div><!-- end main -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const SPEEDS = [0.25,0.5,1.0,1.5,2.0,4.0];
+const BASE_DELAY = 700;
+let speedIdx = 2;
+let steps = [];
+let currentStep = -1;
+let playInterval = null;
+let isPlaying = false;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const PRESETS = [
+  {T:'ABCABCABD', P:'ABD', label:'Basic match'},
+  {T:'AABAACAAD', P:'AAC', label:'Spurious hit demo'},
+  {T:'AAAA', P:'AA', label:'Multiple matches'},
+  {T:'HELLO', P:'XYZ', label:'No match'},
+  {T:'AABABAA', P:'ABA', label:'Overlapping matches'},
+];
+
+// PSEUDOCODE
+const PSEUDO = [
+  {code:'RABIN-KARP(T, P, d, q):', tip:'Entry: search for P in T using rolling hash'},
+  {code:'  n=len(T); m=len(P)', tip:'n = text length, m = pattern length'},
+  {code:'  h = d^(m-1) mod q', tip:'Precompute high-order coefficient — used in rolling update'},
+  {code:'  pHash=0; wHash=0', tip:'Initialize pattern hash and first window hash to 0'},
+  {code:'  for i=0 to m-1:', tip:'Compute initial hash for pattern and first window'},
+  {code:'    pHash=(d*pHash+P[i]) mod q', tip:'Horner\'s method: accumulate polynomial hash of pattern'},
+  {code:'    wHash=(d*wHash+T[i]) mod q', tip:'Horner\'s method: accumulate polynomial hash of first window T[0..m-1]'},
+  {code:'  for i=0 to n-m:', tip:'Slide window across text — (n-m+1) positions total'},
+  {code:'    if pHash==wHash:', tip:'Hash comparison: O(1). Match means POSSIBLE pattern match — must verify'},
+  {code:'      if T[i..i+m-1]==P:', tip:'Character-by-character verification: O(m). Rules out spurious hits'},
+  {code:'        report match at i', tip:'Confirmed real match — pattern found at position i'},
+  {code:'    if i < n-m:', tip:'Only roll hash if there is a next window to process'},
+  {code:'      wHash=(d*(wHash-T[i]*h)+T[i+m]) mod q', tip:'Rolling update: remove outgoing char T[i], add incoming char T[i+m]. O(1)'},
+  {code:'      wHash=(wHash+q) mod q', tip:'Add q before mod to handle negative intermediate values'},
+];
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+  buildPseudo();
+  document.getElementById('inputT').addEventListener('input', updateHints);
+  document.getElementById('inputP').addEventListener('input', updateHints);
+  updateHints();
+  renderText('', '', -1, -1, [], []);
+}
+
+function buildPseudo() {
+  document.getElementById('pseudoBlock').innerHTML = PSEUDO.map((p,i) =>
+    `<div class="pseudo-line" id="pl${i}">
+      <span class="pseudo-num">${String(i+1).padStart(2)}</span>
+      <span class="pseudo-code">${esc(p.code)}</span>
+      <span class="tooltip">${p.tip}</span>
+    </div>`
+  ).join('');
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function updateHints() {
+  const T = document.getElementById('inputT').value;
+  const P = document.getElementById('inputP').value;
+  document.getElementById('hintT').textContent = `Length: ${T.length}`;
+  document.getElementById('hintP').textContent = `Length: ${P.length} — ${T.length-P.length+1} windows to check`;
+}
+
+function loadPreset(i) {
+  const p = PRESETS[i];
+  document.getElementById('inputT').value = p.T;
+  document.getElementById('inputP').value = p.P;
+  updateHints(); resetAll();
+}
+
+function updateSpeed() {
+  speedIdx = parseInt(document.getElementById('speedSlider').value);
+  document.getElementById('speedLabel').textContent = SPEEDS[speedIdx].toFixed(2).replace('.00','')+'×';
+}
+
+// ═══════════════════════════════════════════════════════
+// HASH MATH
+// ═══════════════════════════════════════════════════════
+function strHash(s, d, q) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (d * h + s.charCodeAt(i)) % q;
+  return h;
+}
+
+function powMod(base, exp, mod) {
+  let result = 1, b = base % mod;
+  while (exp > 0) {
+    if (exp % 2 === 1) result = (result * b) % mod;
+    exp = Math.floor(exp / 2); b = (b * b) % mod;
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD STEPS
+// ═══════════════════════════════════════════════════════
+function buildSteps() {
+  const T = document.getElementById('inputT').value;
+  const P = document.getElementById('inputP').value;
+  const d = parseInt(document.getElementById('inputD').value);
+  const q = parseInt(document.getElementById('inputQ').value);
+
+  if (!T || !P || P.length > T.length) {
+    alert('Text must be longer than pattern.'); return;
+  }
+
+  steps = [];
+  const n = T.length, m = P.length;
+  const h = powMod(d, m - 1, q);
+  const pHash = strHash(P, d, q);
+
+  let hashComps = 0, charVerifs = 0, spurious = 0, matches = 0;
+  const matchPositions = [], spuriousPositions = [];
+
+  // Step: init hashes
+  let wHash = strHash(T.substring(0, m), d, q);
+  steps.push({
+    type:'init', line:4, phase:'init', pos:-1, pHash, wHash, h, d, q, T, P, m,
+    hashComps, charVerifs, spurious, matches, matchPositions:[], spuriousPositions:[],
+    explain:`Initialize: precompute h = d^(m−1) mod q = ${d}^${m-1} mod ${q} = ${h}. Compute hash(P="${P}") = ${pHash} and hash(T[0..${m-1}]="${T.substring(0,m)}") = ${wHash} using Horner's method.`,
+    windowState:'normal', verifyResult:null
+  });
+
+  for (let i = 0; i <= n - m; i++) {
+    hashComps++;
+    const window = T.substring(i, i + m);
+    const hashMatch = pHash === wHash;
+
+    if (hashMatch) {
+      // Check char by char
+      const realMatch = window === P;
+      if (realMatch) {
+        charVerifs += m; matches++;
+        matchPositions.push(i);
+        steps.push({
+          type:'hash_match_real', line:8, phase:'match', pos:i, pHash, wHash, h, d, q, T, P, m,
+          hashComps, charVerifs, spurious, matches,
+          matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
+          explain:`Position ${i}: hash(window "${window}") = ${wHash} = hash(P) = ${pHash}. HASH MATCH! Verify character by character: ${P.split('').map((c,j)=>c+'='+window[j]).join(', ')} ✓ — REAL MATCH at position ${i}!`,
+          windowState:'match', verifyResult:'match'
+        });
+      } else {
+        charVerifs += m; spurious++;
+        spuriousPositions.push(i);
+        steps.push({
+          type:'hash_match_spurious', line:8, phase:'spurious', pos:i, pHash, wHash, h, d, q, T, P, m,
+          hashComps, charVerifs, spurious, matches,
+          matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
+          explain:`Position ${i}: hash(window "${window}") = ${wHash} = hash(P) = ${pHash}. HASH MATCH! Verify: ${P.split('').map((c,j)=>c+'='+window[j]).join(', ')} — MISMATCH at position ${[...P].findIndex((c,j)=>c!==window[j])}. ⚠ SPURIOUS HIT! Hash collision — not a real match.`,
+          windowState:'spurious', verifyResult:'spurious'
+        });
+      }
+    } else {
+      steps.push({
+        type:'hash_no_match', line:8, phase:'slide', pos:i, pHash, wHash, h, d, q, T, P, m,
+        hashComps, charVerifs, spurious, matches,
+        matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
+        explain:`Position ${i}: hash(window "${window}") = ${wHash} ≠ hash(P) = ${pHash}. No hash match — skip verification, slide window right.`,
+        windowState:'window', verifyResult:null
+      });
+    }
+
+    // Roll hash
+    if (i < n - m) {
+      const outChar = T.charCodeAt(i);
+      const inChar = T.charCodeAt(i + m);
+      wHash = ((d * ((wHash - outChar * h % q) + q)) % q + inChar) % q;
+      steps.push({
+        type:'roll', line:12, phase:'slide', pos:i, pHash, wHash, h, d, q, T, P, m,
+        hashComps, charVerifs, spurious, matches,
+        matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
+        explain:`Roll hash: remove T[${i}]="${T[i]}" (code ${outChar}), add T[${i+m}]="${T[i+m]}" (code ${inChar}). new_hash = (${d}×(${((d*((steps[steps.length-1].wHash)-outChar*h%q+q))%q)}}+${inChar}) mod ${q} = ${wHash}. Next window will be "${T.substring(i+1,i+m+1)}".`,
+        windowState:'normal', verifyResult:null
+      });
+    }
+  }
+
+  // Final
+  steps.push({
+    type:'done', line:7, phase:'match', pos:-1, pHash, wHash, h, d, q, T, P, m,
+    hashComps, charVerifs, spurious, matches,
+    matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
+    explain:`Search complete. Found ${matches} real match${matches!==1?'es':''} at position${matchPositions.length!==1?'s':''} [${matchPositions.join(', ')||'none'}]. ${spurious} spurious hit${spurious!==1?'s':''} (hash collision${spurious!==1?'s':''}). Total hash comparisons: ${hashComps}. Character verifications: ${charVerifs}.`,
+    windowState:'normal', verifyResult:null
+  });
+
+  currentStep = -1;
+  document.getElementById('stepCurrent').textContent = '0';
+  document.getElementById('stepTotal').textContent = steps.length;
+  document.getElementById('historyBody').innerHTML = '';
+  document.getElementById('resultBox').style.display = 'none';
+  setStatus('ready');
+  setButtons({build:true,step:true,play:true,pause:false,reset:true});
+  renderText(T, P, -1, m, [], []);
+  updateCounters(0,0,0,0);
+}
+
+// ═══════════════════════════════════════════════════════
+// APPLY STEP
+// ═══════════════════════════════════════════════════════
+function applyStep(i) {
+  if (i < 0 || i >= steps.length) return;
+  const s = steps[i];
+
+  // Counters
+  updateCounters(s.hashComps, s.charVerifs, s.spurious, s.matches);
+  document.getElementById('stepCurrent').textContent = i+1;
+
+  // Pseudocode
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  const pl = document.getElementById('pl'+s.line);
+  if (pl) { pl.classList.add('active'); pl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+
+  // Phase badge
+  const phMap = {init:'Initialise Hashes', slide:'Slide Window', match:'Real Match ✓', spurious:'Spurious Hit ⚠', hash_match:'Hash Check'};
+  const phClass = {init:'ph-init',slide:'ph-slide',match:'ph-match',spurious:'ph-spurious'}[s.phase]||'ph-hash';
+  const phaseName = phMap[s.phase]||'Hash Compare';
+  document.getElementById('stepExplain').innerHTML = `<span class="phase-badge ${phClass}">${phaseName}</span><br>${s.explain}`;
+  triggerMotion(document.getElementById('stepExplain'), 'motion-pulse');
+
+  // Text visualization
+  renderText(s.T, s.P, s.pos, s.m, s.matchPositions, s.spuriousPositions, s.windowState, s.type);
+
+  // Hash display
+  renderHashDisplay(s);
+
+  // Rolling formula update
+  if (s.type === 'roll' || s.type === 'hash_no_match' || s.type === 'hash_match_real' || s.type === 'hash_match_spurious') {
+    document.getElementById('rollingFormula').textContent =
+      `hash_new = (${s.d} × (hash_old − T[i] × ${s.h}) + T[i+m]) mod ${s.q}\n= (${s.d} × (prev − char × ${s.h}) + next) mod ${s.q}\nnew hash = ${s.wHash}`;
+  }
+
+  // Matches wrap
+  renderMatchesSummary(s);
+
+  // Done
+  if (s.type === 'done') {
+    renderResult(s);
+    renderLiveCompare(s);
+    setStatus('done');
+    setButtons({build:true,step:false,play:false,pause:false,reset:true});
+  }
+
+  // History
+  addHistory(i, s);
+}
+
+function renderText(T, P, pos, m, matchPos, spuriousPos, windowState, type) {
+  const textRow = document.getElementById('textRow');
+  const patRow = document.getElementById('patRow');
+  if (!T) { textRow.innerHTML=''; patRow.innerHTML=''; return; }
+
+  textRow.innerHTML = T.split('').map((c,i) => {
+    let cls = 'ch-normal';
+    if (matchPos && matchPos.some(mp => i >= mp && i < mp + m)) cls = 'ch-match';
+    else if (spuriousPos && spuriousPos.some(sp => i >= sp && i < sp + m)) cls = 'ch-spurious';
+    else if (pos >= 0 && i >= pos && i < pos + m) {
+      if (windowState === 'match') cls = 'ch-match';
+      else if (windowState === 'spurious') cls = 'ch-spurious';
+      else cls = 'ch-checking';
+    }
+    else if (pos >= 0 && i < pos) cls = 'ch-processed';
+    return `<div class="char-box ${cls}">${esc(c)}<span class="char-idx">${i}</span></div>`;
+  }).join('');
+
+  if (P && m) {
+    patRow.innerHTML = P.split('').map((c,i) =>
+      `<div class="char-box ch-window">${esc(c)}<span class="char-idx">${i}</span></div>`
+    ).join('');
+  }
+}
+
+function renderHashDisplay(s) {
+  const pBox = document.getElementById('hashP');
+  const wBox = document.getElementById('hashW');
+  const eq = document.getElementById('hashEqSign');
+  document.getElementById('hashPVal').textContent = s.pHash;
+  document.getElementById('hashWVal').textContent = s.wHash;
+
+  if (s.type === 'hash_match_real') {
+    pBox.className='hash-box hash-real'; wBox.className='hash-box hash-real';
+    eq.className='hash-eq'; eq.textContent='=';
+    document.getElementById('hashVerifyRow').innerHTML =
+      `<div style="font-size:12px;color:var(--green);font-weight:600">✓ Hash match confirmed — character verification PASSED → real match at position ${s.pos}</div>`;
+  } else if (s.type === 'hash_match_spurious') {
+    pBox.className='hash-box hash-match'; wBox.className='hash-box hash-match';
+    eq.className='hash-eq'; eq.textContent='=';
+    document.getElementById('hashVerifyRow').innerHTML =
+      `<div style="font-size:12px;color:var(--orange);font-weight:600">⚠ Hash match but character verification FAILED → spurious hit! Not a real match.</div>`;
+  } else if (s.pHash !== s.wHash) {
+    pBox.className='hash-box'; wBox.className='hash-box';
+    eq.className='hash-neq'; eq.textContent='≠';
+    document.getElementById('hashVerifyRow').innerHTML =
+      `<div style="font-size:12px;color:var(--text3)">Hashes differ — skip this window, roll to next position.</div>`;
+  } else {
+    pBox.className='hash-box'; wBox.className='hash-box';
+    eq.className='hash-eq'; eq.textContent='=?';
+    document.getElementById('hashVerifyRow').innerHTML='';
+  }
+}
+
+function renderMatchesSummary(s) {
+  const wrap = document.getElementById('matchesWrap');
+  let html = '';
+  if (s.matchPositions && s.matchPositions.length) {
+    html += '<div style="margin-bottom:6px;font-size:12px;color:var(--text2)">Matches:</div>';
+    html += s.matchPositions.map(p => `<span class="match-tag">pos ${p}: "${s.T.substring(p,p+s.m)}"</span>`).join('');
+  }
+  if (s.spuriousPositions && s.spuriousPositions.length) {
+    html += '<div style="margin:8px 0 6px;font-size:12px;color:var(--text2)">Spurious hits:</div>';
+    html += s.spuriousPositions.map(p => `<span class="spurious-tag">pos ${p}: "${s.T.substring(p,p+s.m)}" (hash=${s.pHash})</span>`).join('');
+  }
+  wrap.innerHTML = html || '<div style="font-size:12px;color:var(--text3)">No matches or spurious hits yet.</div>';
+}
+
+function renderResult(s) {
+  const box = document.getElementById('resultBox');
+  box.style.display='block';
+  box.innerHTML = `<div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:8px">✓ Search Complete</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;font-size:12px">
+      <div style="text-align:center"><div style="color:var(--text3)">Matches</div><div style="font-size:22px;font-weight:700;color:var(--green)">${s.matches}</div></div>
+      <div style="text-align:center"><div style="color:var(--text3)">Spurious hits</div><div style="font-size:22px;font-weight:700;color:var(--orange)">${s.spurious}</div></div>
+      <div style="text-align:center"><div style="color:var(--text3)">Hash comps</div><div style="font-size:22px;font-weight:700;color:var(--teal)">${s.hashComps}</div></div>
+      <div style="text-align:center"><div style="color:var(--text3)">Char verifs</div><div style="font-size:22px;font-weight:700;color:var(--accent)">${s.charVerifs}</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--text2)">Pattern "${s.P}" found at: [${s.matchPositions.join(', ')||'not found'}]</div>`;
+}
+
+function renderLiveCompare(s) {
+  const naiveOps = s.T.length * s.P.length;
+  const rkOps = s.hashComps + s.charVerifs;
+  document.getElementById('liveCompare').innerHTML = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Live operation counts for T="${s.T}", P="${s.P}":</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:12px;color:var(--teal);min-width:110px">Rabin-Karp</span>
+        <div style="flex:1;background:var(--bg4);border-radius:4px;height:8px;overflow:hidden"><div style="width:${Math.min(100,(rkOps/naiveOps)*100)}%;height:100%;background:var(--teal);border-radius:4px"></div></div>
+        <span style="font-size:12px;color:var(--teal);min-width:60px">${rkOps} ops</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:12px;color:var(--red);min-width:110px">Naive O(nm)</span>
+        <div style="flex:1;background:var(--bg4);border-radius:4px;height:8px;overflow:hidden"><div style="width:100%;height:100%;background:var(--red);border-radius:4px"></div></div>
+        <span style="font-size:12px;color:var(--red);min-width:60px">${naiveOps} ops</span>
+      </div>
+    </div>`;
+}
+
+function updateCounters(h,c,sp,m) {
+  document.getElementById('cntHash').textContent=h;
+  document.getElementById('cntChar').textContent=c;
+  document.getElementById('cntSpurious').textContent=sp;
+  document.getElementById('cntMatch').textContent=m;
+}
+
+function addHistory(i, s) {
+  const tbody = document.getElementById('historyBody');
+  const tr = document.createElement('tr');
+  tr.dataset.step = i;
+  const typeLabel = {init:'Init',hash_no_match:'No match',hash_match_real:'Match ✓',hash_match_spurious:'Spurious ⚠',roll:'Roll hash',done:'Done'}[s.type]||s.type;
+  const window = s.pos >= 0 ? `"${s.T.substring(s.pos, s.pos+s.m)}"` : '—';
+  tr.innerHTML = `<td>${i+1}</td><td>${typeLabel}</td><td style="font-family:monospace">${window}</td><td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.explain.substring(0,40)}…</td>`;
+  tr.addEventListener('click', ()=>jumpToStep(parseInt(tr.dataset.step)));
+  tbody.insertBefore(tr, tbody.firstChild);
+  while (tbody.rows.length > 30) tbody.deleteRow(tbody.rows.length-1);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.remove('current-row'));
+  tr.classList.add('current-row');
+  triggerMotion(tr, 'motion-flash');
+}
+
+function jumpToStep(i) {
+  if (i < 0 || i >= steps.length) return;
+  pausePlay(); currentStep = i; applyStep(i);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.toggle('current-row',parseInt(r.dataset.step)===i));
+}
+
+function stepForward() {
+  if (currentStep < steps.length-1) {
+    currentStep++; applyStep(currentStep);
+    if (currentStep===steps.length-1){setStatus('done');setButtons({build:true,step:false,play:false,pause:false,reset:true});}
+  }
+}
+
+function startPlay() {
+  if (isPlaying||currentStep>=steps.length-1) return;
+  isPlaying=true; setStatus('playing');
+  setButtons({build:false,step:false,play:false,pause:true,reset:false});
+  playInterval=setInterval(()=>{
+    if(currentStep<steps.length-1){currentStep++;applyStep(currentStep);}
+    else{pausePlay();setStatus('done');setButtons({build:true,step:false,play:false,pause:false,reset:true});}
+  },BASE_DELAY/SPEEDS[speedIdx]);
+}
+
+function pausePlay() {
+  isPlaying=false;
+  if(playInterval){clearInterval(playInterval);playInterval=null;}
+  if(steps.length&&currentStep>=0&&currentStep<steps.length-1){setStatus('paused');setButtons({build:true,step:true,play:true,pause:false,reset:true});}
+}
+
+function resetAll() {
+  pausePlay(); steps=[]; currentStep=-1;
+  document.getElementById('stepCurrent').textContent='0';
+  document.getElementById('stepTotal').textContent='0';
+  document.getElementById('stepExplain').innerHTML='<span style="color:var(--text3)">🎓 Click <strong>Build Steps</strong> to begin.</span>';
+  document.getElementById('historyBody').innerHTML='';
+  document.getElementById('resultBox').style.display='none';
+  document.getElementById('matchesWrap').innerHTML='<div style="font-size:12px;color:var(--text3)">Run the algorithm to see results.</div>';
+  document.getElementById('hashPVal').textContent='—';
+  document.getElementById('hashWVal').textContent='—';
+  document.getElementById('hashEqSign').textContent='=?';
+  document.getElementById('hashVerifyRow').innerHTML='';
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  updateCounters(0,0,0,0);
+  setStatus('idle');
+  setButtons({build:true,step:false,play:false,pause:false,reset:false});
+  const T=document.getElementById('inputT').value;
+  const P=document.getElementById('inputP').value;
+  if(T&&P) renderText(T,P,-1,P.length,[],[]);
+}
+
+function setStatus(s){const el=document.getElementById('statusBadge');el.className='status-badge status-'+s;el.textContent=s.charAt(0).toUpperCase()+s.slice(1);triggerMotion(el,'motion-pulse');}
+function setButtons(c){['Build','Step','Play','Pause','Reset'].forEach(n=>{document.getElementById('btn'+n).disabled=!c[n.toLowerCase()];});}
+function toggleCollapse(id){const body=document.getElementById('body-'+id);const arrow=document.getElementById('arrow-'+id);const isOpen=body.style.maxHeight!=='0px'&&body.style.maxHeight!=='';if(isOpen){body.style.maxHeight='0';body.style.overflow='hidden';arrow.classList.remove('open');}else{body.style.maxHeight=body.scrollHeight+3000+'px';body.style.overflow='visible';arrow.classList.add('open');}}
+
+function triggerMotion(el, cls){
+  if(!el || reduceMotion) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+  el.addEventListener('animationend', ()=>el.classList.remove(cls), {once:true});
+}
+
+init();
+setButtons({build:true,step:false,play:false,pause:false,reset:false});
+</script>
+</body>
+</html>
