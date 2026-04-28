@@ -969,16 +969,23 @@ function toggleCollapse(id) {
 // ═══════════════════════════════════════════════════════════
 // UNIT CIRCLE SVG
 // ═══════════════════════════════════════════════════════════
+function getRootLabel(k, n) {
+  if (k === 0) return '=1';
+  if (n % 2 === 0 && k === n/2) return '=−1';
+  if (n % 4 === 0 && k === n/4) return '=i';
+  if (n % 4 === 0 && k === 3*n/4) return '=−i';
+  return '';
+}
+
 function drawCircle(activeIndices, n, phase) {
   const svg = document.getElementById('svgCircle');
-  const cx=130, cy=135, r=90;
+  const cx=130, cy=130, r=90;
   let html = '';
   // Axes
   html += `<line x1="${cx-r-10}" y1="${cy}" x2="${cx+r+10}" y2="${cy}" stroke="var(--border)" stroke-width="0.5"/>`;
   html += `<line x1="${cx}" y1="${cy-r-10}" x2="${cx}" y2="${cy+r+10}" stroke="var(--border)" stroke-width="0.5"/>`;
   // Circle
   html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="0.8"/>`;
-  html += `<text x="${cx}" y="${cy-r-14}" text-anchor="middle" fill="var(--text2)" font-size="11">Unit Circle (n=${n} roots)</text>`;
 
   const color = phase==='fft'?'var(--phase1)':phase==='mult'?'var(--phase2)':phase==='ifft'?'var(--phase3)':'var(--accent)';
 
@@ -987,32 +994,45 @@ function drawCircle(activeIndices, n, phase) {
     const px = cx + r*Math.cos(angle);
     const py = cy + r*Math.sin(angle);
     const isActive = activeIndices.includes(k);
-    // Cancellation pairs — highlight opposite roots
     const isPair = activeIndices.includes(k) && activeIndices.includes((k+n/2)%n);
 
     if (isActive) {
-      // Line from center
       html += `<line x1="${cx}" y1="${cy}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="${color}" stroke-width="0.8" opacity="0.5"/>`;
-      // Dot
       html += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="7" fill="${color}" opacity="0.9"/>`;
       html += `<text x="${px.toFixed(1)}" y="${(py+1).toFixed(1)}" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="9" font-weight="600">ω${supScript(k)}</text>`;
-      // If this is a cancellation pair, annotate
       if (n<=8 && isPair && k < n/2) {
-        const pk2angle = -2*Math.PI*(k+n/2)/n - Math.PI/2;
+        const pk2angle = -2*Math.PI*(k+n/2)/n;
         const px2 = cx + r*Math.cos(pk2angle), py2 = cy + r*Math.sin(pk2angle);
         html += `<line x1="${px.toFixed(1)}" y1="${py.toFixed(1)}" x2="${px2.toFixed(1)}" y2="${py2.toFixed(1)}" stroke="var(--yellow)" stroke-width="0.8" stroke-dasharray="3,2"/>`;
         html += `<text x="${(px+px2)/2}" y="${(py+py2)/2-6}" text-anchor="middle" fill="var(--yellow)" font-size="9">−1</text>`;
       }
     } else {
       html += `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4" fill="var(--text3)" opacity="0.5"/>`;
-      if (n<=8) html += `<text x="${(cx+(r+16)*Math.cos(angle)).toFixed(1)}" y="${(cy+(r+16)*Math.sin(angle)+3).toFixed(1)}" text-anchor="middle" fill="var(--text3)" font-size="9">ω${supScript(k)}</text>`;
+      if (n<=8) {
+        const cosA = Math.cos(angle), sinA = Math.sin(angle);
+        let anchor, lx, ly;
+        if (cosA > 0.95) {
+          // Right cardinal — pin to right edge so label doesn't clip the viewBox
+          anchor = 'end'; lx = 256; ly = cy + 4;
+        } else if (cosA < -0.95) {
+          // Left cardinal — pin to left edge so label doesn't clip the viewBox
+          anchor = 'start'; lx = 4; ly = cy + 4;
+        } else {
+          anchor = cosA > 0.3 ? 'start' : cosA < -0.3 ? 'end' : 'middle';
+          lx = cx + (r+20)*cosA;
+          ly = cy + (r+20)*sinA + (sinA > 0.3 ? 9 : sinA < -0.3 ? 0 : 4);
+        }
+        html += `<text x="${Number(lx).toFixed(1)}" y="${Number(ly).toFixed(1)}" text-anchor="${anchor}" fill="var(--text3)" font-size="9">ω${supScript(k)}${getRootLabel(k,n)}</text>`;
+      }
     }
   }
-  // Labels
-  html += `<text x="${cx+r+14}" y="${cy+4}" fill="var(--text3)" font-size="10">+1</text>`;
-  html += `<text x="${cx-r-28}" y="${cy+4}" fill="var(--text3)" font-size="10">−1</text>`;
-  html += `<text x="${cx-4}" y="${cy-r-4}" fill="var(--text3)" font-size="10">+i</text>`;
-  html += `<text x="${cx-4}" y="${cy+r+12}" fill="var(--text3)" font-size="10">−i</text>`;
+  // Axis labels only for large n (small n uses combined root+value labels above)
+  if (n > 8) {
+    html += `<text x="${cx+r+4}" y="${cy+4}" text-anchor="start" fill="var(--text3)" font-size="9">+1</text>`;
+    html += `<text x="${cx-r-4}" y="${cy+4}" text-anchor="end" fill="var(--text3)" font-size="9">−1</text>`;
+    html += `<text x="${cx+4}" y="${cy-r-6}" fill="var(--text3)" font-size="9">+i</text>`;
+    html += `<text x="${cx+4}" y="${cy+r+13}" fill="var(--text3)" font-size="9">−i</text>`;
+  }
 
   // Cancellation legend if active
   if (activeIndices.length >= 2) {
