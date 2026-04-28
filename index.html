@@ -730,10 +730,10 @@ body{
   <div class="modal narrow">
     <h3>Open All Four Tools</h3>
     <div class="modal-tool-list">
-      <a class="link-btn primary" href="fft-polynomial.html" target="_blank" rel="noopener" onclick="markVisited(2);hideAllTools()">CLO-2 &nbsp;FFT Polynomial Multiplication →</a>
-      <a class="link-btn clo3" href="miller-rabin.html" target="_blank" rel="noopener" onclick="markVisited(3);hideAllTools()">CLO-3 &nbsp;Miller-Rabin Primality Testing →</a>
-      <a class="link-btn clo4" href="rabin-karp.html" target="_blank" rel="noopener" onclick="markVisited(4);hideAllTools()">CLO-4 &nbsp;Rabin-Karp String Matching →</a>
-      <a class="link-btn clo5" href="metric-tsp.html" target="_blank" rel="noopener" onclick="markVisited(5);hideAllTools()">CLO-5 &nbsp;2-Approximation Metric TSP →</a>
+      <a class="link-btn primary" href="fft-polynomial.html" onclick="markVisited(2);hideAllTools()">CLO-2 &nbsp;FFT Polynomial Multiplication →</a>
+      <a class="link-btn clo3" href="miller-rabin.html" onclick="markVisited(3);hideAllTools()">CLO-3 &nbsp;Miller-Rabin Primality Testing →</a>
+      <a class="link-btn clo4" href="rabin-karp.html" onclick="markVisited(4);hideAllTools()">CLO-4 &nbsp;Rabin-Karp String Matching →</a>
+      <a class="link-btn clo5" href="metric-tsp.html" onclick="markVisited(5);hideAllTools()">CLO-5 &nbsp;2-Approximation Metric TSP →</a>
     </div>
     <button class="btn modal-close" onclick="hideAllTools()">Close</button>
   </div>
@@ -1215,7 +1215,7 @@ window.addEventListener('keydown', (e) => {
   if(e.metaKey || e.ctrlKey || e.altKey) return;
   if(KEY_TO_PAGE[e.key]){
     markVisited(KEY_TO_CLO[e.key]);
-    window.open(KEY_TO_PAGE[e.key], '_blank');
+    window.location.href = KEY_TO_PAGE[e.key];
     showToast('Opened CLO-' + KEY_TO_CLO[e.key]);
   } else if(e.key === 't' || e.key === 'T'){
     startTour();
