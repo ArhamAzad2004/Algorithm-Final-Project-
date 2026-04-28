@@ -1012,15 +1012,15 @@ function drawCircle(activeIndices, n, phase) {
         const cosA = Math.cos(angle), sinA = Math.sin(angle);
         let anchor, lx, ly;
         if (Math.abs(cosA) > 0.95) {
-          // Horizontal cardinal (left/right) — place below the axis to clear the dot
-          anchor = 'middle';
-          lx = cx + (r + 14) * cosA;
-          ly = cy + 22;
+          // Horizontal cardinal — label beside the dot growing away from it
+          anchor = cosA > 0 ? 'start' : 'end';
+          lx = cx + (r + 12) * cosA;
+          ly = cy + 4;
         } else if (Math.abs(sinA) > 0.95) {
-          // Vertical cardinal (top/bottom) — offset right of axis to clear the dot
+          // Vertical cardinal — label above/below, shifted right of the axis line
           anchor = 'start';
           lx = cx + 8;
-          ly = cy + (r + 16) * sinA + (sinA > 0 ? 10 : 0);
+          ly = sinA < 0 ? cy - r - 12 : cy + r + 16;
         } else {
           // Diagonal — standard radial offset with quadrant-aware anchor
           anchor = cosA > 0.3 ? 'start' : cosA < -0.3 ? 'end' : 'middle';
@@ -1033,10 +1033,10 @@ function drawCircle(activeIndices, n, phase) {
   }
   // Axis labels only for large n (small n uses combined root+value labels above)
   if (n > 8) {
-    html += `<text x="${cx+r+12}" y="${cy+20}" text-anchor="start" fill="var(--text3)" font-size="9">+1</text>`;
-    html += `<text x="${cx-r-12}" y="${cy+20}" text-anchor="end" fill="var(--text3)" font-size="9">−1</text>`;
-    html += `<text x="${cx+10}" y="${cy-r-16}" fill="var(--text3)" font-size="9">+i</text>`;
-    html += `<text x="${cx+10}" y="${cy+r+20}" fill="var(--text3)" font-size="9">−i</text>`;
+    html += `<text x="${cx+r+12}" y="${cy+4}" text-anchor="start" fill="var(--text3)" font-size="9">+1</text>`;
+    html += `<text x="${cx-r-12}" y="${cy+4}" text-anchor="end" fill="var(--text3)" font-size="9">−1</text>`;
+    html += `<text x="${cx+8}" y="${cy-r-12}" fill="var(--text3)" font-size="9">+i</text>`;
+    html += `<text x="${cx+8}" y="${cy+r+16}" fill="var(--text3)" font-size="9">−i</text>`;
   }
 
   // Cancellation legend if active
