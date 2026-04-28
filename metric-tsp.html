@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2-Approximation Metric TSP — BSD 404 CLO-5</title>
+<style>
+:root {
+  --bg:#0f1117;--bg2:#161b25;--bg3:#1e2535;--bg4:#252d3e;
+  --border:#2e3a50;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#3b82f6;--green:#22c55e;--orange:#f97316;--purple:#a855f7;
+  --yellow:#eab308;--red:#ef4444;--teal:#14b8a6;--pink:#ec4899;
+  --mst:#3b82f6;--dfs:#f97316;--tour:#22c55e;--city:#e2e8f0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:10;}
+.header-title{font-size:18px;font-weight:700;}
+.header-sub{font-size:12px;color:var(--text2);}
+.clo-badge{background:var(--orange);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+.main{display:flex;min-height:calc(100vh - 56px);}
+.panel-left{width:420px;min-width:420px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;}
+.panel-right{flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;}
+input[type=text]{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;outline:none;transition:border-color .2s;font-family:monospace;}
+input[type=text]:focus{border-color:var(--accent);}
+.preset-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.btn-preset{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.btn-preset:hover{background:var(--bg3);border-color:var(--accent);color:var(--text);}
+.speed-row{display:flex;align-items:center;gap:10px;}
+.speed-row span{font-size:12px;color:var(--text2);white-space:nowrap;}
+input[type=range]{flex:1;accent-color:var(--accent);}
+.speed-val{font-size:12px;color:var(--accent);font-weight:600;min-width:34px;text-align:right;}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--orange);color:#fff;}
+.btn-primary:hover{filter:brightness(1.1);}
+.btn-secondary{background:var(--bg4);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--bg3);border-color:var(--orange);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:2px;}
+.stat-val{font-size:15px;font-weight:700;}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;}
+.status-idle{background:#1e2535;color:var(--text2);}
+.status-ready{background:#1a2e1a;color:var(--green);}
+.status-playing{background:#1a2040;color:var(--accent);}
+.status-paused{background:#2a2010;color:var(--yellow);}
+.status-done{background:#1a2e2a;color:var(--teal);}
+/* PSEUDO */
+.pseudo-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow-y:auto;max-height:320px;}
+.pseudo-line{display:flex;align-items:flex-start;padding:3px 10px;font-family:'Courier New',monospace;font-size:12px;color:var(--text2);cursor:pointer;position:relative;transition:background .15s;}
+.pseudo-line:hover{background:var(--bg3);}
+.pseudo-line.active{background:rgba(249,115,22,.18);color:var(--text);border-left:3px solid var(--orange);}
+.pseudo-num{color:var(--text3);min-width:22px;margin-right:8px;user-select:none;font-size:11px;padding-top:1px;}
+.pseudo-code{flex:1;white-space:pre;}
+.pseudo-line .tooltip{display:none;position:absolute;left:100%;top:0;z-index:99;background:#1a1a2e;border:1px solid var(--orange);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);min-width:200px;max-width:300px;white-space:normal;pointer-events:none;}
+.pseudo-line:hover .tooltip{display:block;}
+/* KEY CONCEPT */
+.key-concept{border-left:3px solid var(--yellow);background:rgba(234,179,8,.07);padding:10px 14px;border-radius:0 6px 6px 0;margin:8px 0;}
+.key-concept-title{font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:4px;}
+.key-concept p{font-size:12px;color:var(--text2);}
+/* STEP EXPLAIN */
+.step-explain{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:12px;min-height:64px;font-size:13px;color:var(--text);line-height:1.6;}
+.phase-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-bottom:6px;}
+.ph-mst{background:rgba(59,130,246,.2);color:var(--mst);}
+.ph-dfs{background:rgba(249,115,22,.2);color:var(--dfs);}
+.ph-tour{background:rgba(34,197,94,.2);color:var(--tour);}
+.ph-init{background:rgba(168,85,247,.2);color:var(--purple);}
+/* HISTORY */
+.history-table-wrap{max-height:180px;overflow-y:auto;border-radius:6px;border:1px solid var(--border);}
+.history-table{width:100%;border-collapse:collapse;font-size:12px;}
+.history-table th{background:var(--bg4);color:var(--text2);font-weight:600;padding:6px 8px;text-align:left;position:sticky;top:0;font-size:11px;border-bottom:1px solid var(--border);}
+.history-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.5);color:var(--text2);}
+.history-table tr:hover td{background:var(--bg4);color:var(--text);cursor:pointer;}
+.history-table tr.current-row td{background:rgba(249,115,22,.12);color:var(--text);}
+/* CANVAS */
+#tspCanvas{border-radius:8px;cursor:crosshair;display:block;}
+/* COST BARS */
+.cost-row{display:flex;align-items:center;gap:10px;padding:6px 0;}
+.cost-label{font-size:12px;color:var(--text2);min-width:110px;}
+.cost-bar-wrap{flex:1;background:var(--bg4);border-radius:4px;height:10px;overflow:hidden;}
+.cost-bar{height:100%;border-radius:4px;transition:width .5s ease;}
+.cost-val{font-size:13px;font-weight:700;min-width:70px;text-align:right;}
+/* PROOF CHAIN */
+.proof-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 0;}
+.proof-node{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;text-align:center;border:1px solid var(--border);}
+.proof-arrow{color:var(--text3);font-size:18px;font-weight:700;}
+/* WORKED TABLE */
+.worked-table{width:100%;border-collapse:collapse;font-size:12px;}
+.worked-table th{background:var(--bg4);padding:6px 8px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);text-align:left;}
+.worked-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.4);color:var(--text2);font-family:monospace;}
+.worked-table tr.highlight td{color:var(--green);font-weight:600;}
+/* COLLAPSIBLE */
+.collapsible-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;user-select:none;}
+.collapsible-header h3{font-size:13px;font-weight:600;color:var(--text);}
+.collapsible-arrow{color:var(--text3);font-size:11px;transition:transform .2s;}
+.collapsible-arrow.open{transform:rotate(180deg);}
+.collapsible-body{transition:max-height .3s ease;}
+.section-text{font-size:13px;color:var(--text2);line-height:1.7;}
+/* LECTURE */
+.lecture-section{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;}
+.lecture-h3{font-size:14px;font-weight:700;color:var(--text);margin:14px 0 6px;}
+.lecture-code{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:12px;color:#7dd3fc;overflow-x:auto;white-space:pre;margin:8px 0;line-height:1.7;}
+.notice{font-size:11px;color:var(--text3);background:var(--bg4);padding:6px 10px;border-radius:5px;border-left:2px solid var(--text3);}
+.result-box{background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:14px;}
+
+@keyframes pulseGlow{
+  0%{box-shadow:0 0 0 rgba(249,115,22,0);transform:translateY(0);}
+  50%{box-shadow:0 0 0 6px rgba(249,115,22,.15);transform:translateY(-1px);}
+  100%{box-shadow:0 0 0 rgba(249,115,22,0);transform:translateY(0);}
+}
+
+@keyframes fadeFlash{
+  0%{background:rgba(249,115,22,.24);}
+  100%{background:transparent;}
+}
+
+.motion-pulse{animation:pulseGlow .45s ease;}
+.motion-flash{animation:fadeFlash .5s ease;}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation:none !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
+@media(max-width:980px){.main{flex-direction:column;}.panel-left{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">2-Approximation for Metric TSP</div>
+    <div class="header-sub">BSD 404 — Algorithms II &nbsp;|&nbsp; Dr. Arash Kermani &nbsp;|&nbsp; Interactive Teaching Tool</div>
+  </div>
+  <span class="clo-badge">CLO-5</span>
+</div>
+
+<div class="main">
+<!-- ═══ LEFT PANEL ═══ -->
+<div class="panel-left">
+
+  <div class="card">
+    <div class="card-title">City Input</div>
+    <label>Click the canvas to place cities (max 12), or enter coordinates:</label>
+    <input type="text" id="cityInput" placeholder='e.g. 100,80;200,150;300,90' style="margin-top:6px">
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="clearCities()">Clear Cities</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="loadFromInput()">Load Coords</button>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Click directly on the canvas to place cities, or use presets below.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Quick Examples</div>
+    <div class="preset-grid">
+      <button class="btn-preset" onclick="loadPreset(0)">Square (4 cities)</button>
+      <button class="btn-preset" onclick="loadPreset(1)">Pentagon (5 cities)</button>
+      <button class="btn-preset" onclick="loadPreset(2)">Clustered (8 cities)</button>
+      <button class="btn-preset" onclick="loadPreset(3)">Random (8 cities)</button>
+      <button class="btn-preset" onclick="loadPreset(4)">Line (6 cities)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Algorithm</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+        <input type="radio" name="mstAlgo" value="prim" checked style="accent-color:var(--orange)"> Prim's MST
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0">
+        <input type="radio" name="mstAlgo" value="kruskal" style="accent-color:var(--orange)"> Kruskal's MST
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Speed</div>
+    <div class="speed-row">
+      <span>0.25×</span>
+      <input type="range" id="speedSlider" min="0" max="4" step="1" value="2" oninput="updateSpeed()">
+      <span>4×</span>
+      <span class="speed-val" id="speedLabel">1.0×</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Controls</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnBuild" onclick="buildSteps()">Build Steps</button>
+      <button class="btn btn-secondary" id="btnStep" onclick="stepForward()" disabled>Step</button>
+      <button class="btn btn-secondary" id="btnPlay" onclick="startPlay()" disabled>Play</button>
+      <button class="btn btn-secondary" id="btnPause" onclick="pausePlay()" disabled>Pause</button>
+      <button class="btn btn-secondary" id="btnReset" onclick="resetViz()" disabled>Reset</button>
+    </div>
+    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:13px;color:var(--text2)">Step <span id="stepCurrent" style="color:var(--text);font-weight:700">0</span> / <span id="stepTotal">0</span></div>
+      <span class="status-badge status-idle" id="statusBadge">Idle</span>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Place cities first, then click <strong>Build Steps</strong> to generate the algorithm.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Live Counters</div>
+    <div class="status-grid">
+      <div class="stat-box"><div class="stat-label">MST Edges Added</div><div class="stat-val" style="color:var(--mst)" id="cntMST">0</div></div>
+      <div class="stat-box"><div class="stat-label">DFS Steps</div><div class="stat-val" style="color:var(--dfs)" id="cntDFS">0</div></div>
+      <div class="stat-box"><div class="stat-label">Shortcuts Applied</div><div class="stat-val" style="color:var(--tour)" id="cntShortcut">0</div></div>
+      <div class="stat-box"><div class="stat-label">Cities</div><div class="stat-val" style="color:var(--text)" id="cntCities">0</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Pseudocode <span style="font-size:10px;color:var(--text3)">(hover for tooltip)</span></div>
+    <div class="pseudo-block" id="pseudoBlock"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step Explanation</div>
+    <div class="step-explain" id="stepExplain"><span style="color:var(--text3)">🎓 Place cities on the canvas, then click <strong>Build Steps</strong>.</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step History <span style="font-size:10px;color:var(--text3)">(click row to jump)</span></div>
+    <div class="history-table-wrap">
+      <table class="history-table">
+        <thead><tr><th>#</th><th>Phase</th><th>Action</th><th>Cost</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end left -->
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div class="panel-right">
+
+  <!-- LEGEND -->
+  <div class="card">
+    <div class="card-title">Legend</div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="24" height="12"><line x1="0" y1="6" x2="24" y2="6" stroke="#3b82f6" stroke-width="2.5"/></svg>MST edge</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="24" height="12"><line x1="0" y1="6" x2="24" y2="6" stroke="#f97316" stroke-width="2" stroke-dasharray="5,3"/></svg>DFS walk</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="24" height="12"><line x1="0" y1="6" x2="24" y2="6" stroke="#22c55e" stroke-width="2.5"/></svg>Approx tour</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#3b82f6" opacity="0.8"/></svg>City (unvisited)</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#22c55e" opacity="0.8"/></svg>City (in tour)</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><svg width="16" height="16"><circle cx="8" cy="8" r="7" fill="#f97316" opacity="0.8"/></svg>Current DFS node</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="card" style="padding:10px">
+    <div class="card-title" style="margin-bottom:6px">City Map — Click to Place Cities</div>
+    <canvas id="tspCanvas" width="640" height="380" style="width:100%;background:#0a0e16;border-radius:6px;border:1px solid var(--border)"></canvas>
+  </div>
+
+  <!-- COST COMPARISON -->
+  <div class="card">
+    <div class="card-title">Tour Cost vs Bounds</div>
+    <div class="cost-row">
+      <span class="cost-label" style="color:var(--mst)">MST weight</span>
+      <div class="cost-bar-wrap"><div class="cost-bar" id="barMST" style="background:var(--mst);width:0%"></div></div>
+      <span class="cost-val" style="color:var(--mst)" id="valMST">—</span>
+    </div>
+    <div class="cost-row">
+      <span class="cost-label" style="color:var(--dfs)">DFS walk (≤2×MST)</span>
+      <div class="cost-bar-wrap"><div class="cost-bar" id="barDFS" style="background:var(--dfs);width:0%"></div></div>
+      <span class="cost-val" style="color:var(--dfs)" id="valDFS">—</span>
+    </div>
+    <div class="cost-row">
+      <span class="cost-label" style="color:var(--tour)">Approx tour (≤DFS)</span>
+      <div class="cost-bar-wrap"><div class="cost-bar" id="barTour" style="background:var(--tour);width:0%"></div></div>
+      <span class="cost-val" style="color:var(--tour)" id="valTour">—</span>
+    </div>
+    <div class="cost-row" style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px">
+      <span class="cost-label" style="color:var(--yellow)">2 × MST bound</span>
+      <div class="cost-bar-wrap"><div class="cost-bar" id="bar2MST" style="background:var(--yellow);width:0%"></div></div>
+      <span class="cost-val" style="color:var(--yellow)" id="val2MST">—</span>
+    </div>
+    <div class="notice" style="margin-top:10px">Approximation ratio: <strong id="approxRatio" style="color:var(--green)">—</strong> &nbsp;|&nbsp; Guarantee: tour ≤ <strong>2 × OPT</strong></div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="resultBox" style="display:none" class="result-box"></div>
+
+  <!-- PROOF CHAIN -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('proof')">
+      <h3>🔗 2-Approximation Proof Chain</h3>
+      <span class="collapsible-arrow open" id="arrow-proof">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-proof" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:10px">
+        <div class="proof-chain">
+          <div class="proof-node" style="border-color:var(--green);color:var(--green);background:rgba(34,197,94,.08)">OPT tour</div>
+          <div class="proof-arrow">≥</div>
+          <div class="proof-node" style="border-color:var(--mst);color:var(--mst);background:rgba(59,130,246,.08)">MST weight</div>
+          <div class="proof-arrow">×2 →</div>
+          <div class="proof-node" style="border-color:var(--dfs);color:var(--dfs);background:rgba(249,115,22,.08)">DFS walk</div>
+          <div class="proof-arrow">≥</div>
+          <div class="proof-node" style="border-color:var(--tour);color:var(--tour);background:rgba(34,197,94,.08)">Approx tour</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <div class="key-concept" style="margin:0">
+            <div class="key-concept-title">① OPT ≥ MST (why?)</div>
+            <p>Remove any one edge from the optimal tour → you get a spanning tree (all cities still connected). MST is the minimum weight spanning tree. So MST ≤ any spanning tree ≤ OPT.</p>
+          </div>
+          <div class="key-concept" style="margin:0;border-left-color:var(--dfs);background:rgba(249,115,22,.07)">
+            <div class="key-concept-title" style="color:var(--dfs)">② DFS walk = 2 × MST (why?)</div>
+            <p>A DFS traversal of the MST visits every edge exactly twice — once going down the tree, once returning up. Total DFS walk cost = 2 × MST weight.</p>
+          </div>
+          <div class="key-concept" style="margin:0;border-left-color:var(--tour);background:rgba(34,197,94,.07)">
+            <div class="key-concept-title" style="color:var(--tour)">③ Approx tour ≤ DFS walk (why?)</div>
+            <p>Shortcutting skips already-visited cities. By the triangle inequality: d(A,C) ≤ d(A,B) + d(B,C). Each shortcut costs no more than the detour. So the tour is at most the DFS walk cost.</p>
+          </div>
+          <div class="key-concept" style="margin:0;border-left-color:var(--yellow);background:rgba(234,179,8,.07)">
+            <div class="key-concept-title">🔑 Therefore: Approx tour ≤ DFS ≤ 2×MST ≤ 2×OPT</div>
+            <p>This ONLY holds for metric TSP (triangle inequality must hold). Without it, shortcutting can make the tour worse and the proof breaks completely.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKED EXAMPLE -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('worked')">
+      <h3>📐 Fully Worked Example: 4-City Square</h3>
+      <span class="collapsible-arrow" id="arrow-worked">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-worked" style="max-height:0;overflow:hidden">
+      <div style="padding-top:10px">
+        <p class="section-text" style="margin-bottom:8px">Cities: A(0,0), B(1,0), C(1,1), D(0,1). All edges are Euclidean distances.</p>
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Step 1: Build MST (Prim's starting at A)</div>
+          <p>Add edge A-B (cost 1.0). Add edge B-C (cost 1.0). Add edge C-D (cost 1.0). MST weight = 3.0. Note: diagonal A-C would cost √2 ≈ 1.414, so sides are cheaper.</p>
+        </div>
+        <div class="key-concept" style="margin-top:8px;border-left-color:var(--dfs);background:rgba(249,115,22,.07)">
+          <div class="key-concept-title" style="color:var(--dfs)">🔑 Step 2: DFS walk on MST</div>
+          <p>Starting at A: A→B→C→D→C→B→A (traverses every edge twice). DFS walk cost = 6.0 = 2 × 3.0 ✓</p>
+        </div>
+        <div class="key-concept" style="margin-top:8px;border-left-color:var(--tour);background:rgba(34,197,94,.07)">
+          <div class="key-concept-title" style="color:var(--tour)">🔑 Step 3: Shortcut DFS walk</div>
+          <p>DFS order (first visit): A, B, C, D. Tour: A→B→C→D→A. Cost = 1+1+1+1 = 4.0. Note: 4.0 ≤ 6.0 (DFS walk) ≤ 2×3.0=6.0. Ratio = 4/OPT = 4/4 = 1.0× (happens to be optimal here).</p>
+        </div>
+        <table class="worked-table" style="margin-top:10px">
+          <thead><tr><th>Step</th><th>Action</th><th>Details</th><th>Running Cost</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>MST edge</td><td>A → B (dist 1.0)</td><td>MST=1.0</td></tr>
+            <tr><td>2</td><td>MST edge</td><td>B → C (dist 1.0)</td><td>MST=2.0</td></tr>
+            <tr><td>3</td><td>MST edge</td><td>C → D (dist 1.0)</td><td>MST=3.0</td></tr>
+            <tr><td>4</td><td>DFS walk</td><td>A,B,C,D,C,B,A (each edge ×2)</td><td>DFS walk=6.0</td></tr>
+            <tr class="highlight"><td>5</td><td>Shortcut tour</td><td>A→B→C→D→A</td><td>Tour=4.0 ≤ 2×3=6 ✓</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY CONCEPTS -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('concepts')">
+      <h3>💡 Key Concepts</h3>
+      <span class="collapsible-arrow open" id="arrow-concepts">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-concepts" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Why is TSP NP-complete?</div>
+          <p>No polynomial-time exact algorithm is known. For n cities, brute force checks (n−1)!/2 tours. For n=20: over 60 trillion tours. Approximation algorithms give us good solutions in polynomial time.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--teal);background:rgba(20,184,166,.07)">
+          <div class="key-concept-title" style="color:var(--teal)">🔑 Triangle Inequality — WHY it's essential</div>
+          <p>d(A,C) ≤ d(A,B) + d(B,C) for all cities. Euclidean distance always satisfies this. Without it, the shortcutting step (step 3) would be invalid — a direct edge could cost MORE than the detour, and the proof breaks.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--mst);background:rgba(59,130,246,.07)">
+          <div class="key-concept-title" style="color:var(--mst)">🔑 MST is a lower bound on OPT</div>
+          <p>Take any Hamiltonian tour (visiting all cities once). Remove one edge → spanning tree. MST ≤ this spanning tree ≤ OPT. Therefore MST ≤ OPT always.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--purple);background:rgba(168,85,247,.07)">
+          <div class="key-concept-title" style="color:var(--purple)">🔑 Christofides: 3/2-Approximation</div>
+          <p>Better algorithm: Build MST, then find a minimum weight perfect matching on odd-degree vertices, combine to get an Eulerian circuit, then shortcut. Guarantees tour ≤ 1.5×OPT. More complex but closer to optimal.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--green);background:rgba(34,197,94,.07)">
+          <div class="key-concept-title" style="color:var(--green)">🔑 When does 2× approximation = 1×?</div>
+          <p>When the MST itself forms a Hamiltonian path (visiting all cities without revisiting). Then DFS walk = 2×MST but shortcutting perfectly recovers the MST path, and tour = MST weight = OPT.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LECTURE NOTES -->
+  <div class="lecture-section">
+    <div class="collapsible-header" onclick="toggleCollapse('lecture')">
+      <h2>📖 Lecture Notes — 2-Approximation for Metric TSP</h2>
+      <span class="collapsible-arrow" id="arrow-lecture">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-lecture" style="max-height:0;overflow:hidden">
+      <div style="padding-top:12px">
+        <div class="lecture-h3">1. The Traveling Salesman Problem</div>
+        <p class="section-text">Given n cities with pairwise distances, find the shortest tour visiting each city exactly once and returning to start. NP-complete: no polynomial-time exact solution known. For n=20: (n−1)!/2 ≈ 6×10¹⁶ tours.</p>
+
+        <div class="lecture-h3">2. Metric TSP and Triangle Inequality</div>
+        <p class="section-text">In metric TSP, distances satisfy the triangle inequality: d(u,w) ≤ d(u,v) + d(v,w) for all cities. Euclidean distance (on a map) always satisfies this. This constraint allows the 2-approximation — without it, the problem is even harder to approximate.</p>
+
+        <div class="lecture-h3">3. The Algorithm</div>
+        <div class="lecture-code">APPROX-TSP(G):
+  1. T = MST(G)              // minimum spanning tree
+  2. W = DFS-WALK(T)         // preorder DFS traversal
+  3. Tour = SHORTCUT(W)      // skip revisited cities
+  4. return Tour</div>
+
+        <div class="lecture-h3">4. Prim's MST Algorithm</div>
+        <div class="lecture-code">PRIM(G, start):
+  inMST = {start}
+  while |inMST| < n:
+    (u,v) = min-weight edge with u∈inMST, v∉inMST
+    add edge (u,v) to MST
+    add v to inMST</div>
+        <p class="section-text" style="margin-top:6px">Greedily adds the cheapest edge that connects a new city to the growing MST. O(n²) with adjacency matrix, O(m log n) with priority queue.</p>
+
+        <div class="lecture-h3">5. Why DFS Walk = 2 × MST</div>
+        <p class="section-text">A DFS traversal on a tree visits every edge exactly twice: once in each direction (forward when going deeper, backward when returning). So the total walk cost = sum of all MST edge weights × 2 = 2 × MST weight.</p>
+
+        <div class="lecture-h3">6. Shortcutting with Triangle Inequality</div>
+        <p class="section-text">When DFS revisits a city, we skip it and go directly to the next unvisited city. Triangle inequality guarantees this direct edge costs ≤ the detour. Therefore: Tour cost ≤ DFS walk cost.</p>
+
+        <div class="lecture-h3">7. Christofides (3/2-Approximation)</div>
+        <p class="section-text">Build MST, identify odd-degree vertices (always even count by handshaking lemma), find minimum weight perfect matching on them, combine MST + matching edges into an Eulerian graph, find Eulerian circuit, shortcut. This gives 3/2 × OPT guarantee. Published 1976 — best known ratio for over 40 years until 2020.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end right -->
+</div><!-- end main -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const SPEEDS=[0.25,0.5,1.0,1.5,2.0,4.0];
+const BASE_DELAY=800;
+let speedIdx=2;
+let cities=[];
+let steps=[];
+let currentStep=-1;
+let playInterval=null;
+let isPlaying=false;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas=document.getElementById('tspCanvas');
+const ctx=canvas.getContext('2d');
+
+const PRESETS=[
+  {cities:[{x:160,y:280},{x:480,y:280},{x:480,y:100},{x:160,y:100}], label:'Square'},
+  {cities:[{x:320,y:60},{x:540,y:220},{x:460,y:340},{x:180,y:340},{x:100,y:220}], label:'Pentagon'},
+  {cities:[{x:100,y:100},{x:160,y:140},{x:130,y:80},{x:200,y:120},{x:420,y:260},{x:480,y:220},{x:450,y:300},{x:380,y:280}], label:'Clustered'},
+  {cities:[], label:'Random'},
+  {cities:[{x:80,y:190},{x:180,y:190},{x:280,y:190},{x:380,y:190},{x:480,y:190},{x:560,y:190}], label:'Line'},
+];
+
+// PSEUDOCODE
+const PSEUDO=[
+  {code:'APPROX-TSP(G, cities):', tip:'Entry: approximate TSP tour using MST + DFS shortcutting'},
+  {code:'  T = MST(G)', tip:'Build minimum spanning tree — cheapest tree connecting all cities'},
+  {code:'  // Prim: greedily add min-cost edge to unvisited city', tip:'Prim\'s algorithm: always pick the cheapest edge to an unvisited city'},
+  {code:'  while |T| < n-1 edges:', tip:'MST has exactly n-1 edges for n cities'},
+  {code:'    (u,v) = min edge, u∈MST, v∉MST', tip:'Find the cheapest crossing edge from the current MST to outside'},
+  {code:'    add (u,v) to T', tip:'Add this edge — greedily extend the MST'},
+  {code:'  W = DFS-WALK(T, root=0)', tip:'Perform DFS on the MST. Each edge is traversed twice (forward+back)'},
+  {code:'  // W visits every city, with revisits', tip:'DFS walk order includes backtracking — cities appear multiple times'},
+  {code:'  Tour = []', tip:'Initialize empty tour — we will shortcut the DFS walk'},
+  {code:'  for city in W:', tip:'Process each city in DFS visit order'},
+  {code:'    if city not in Tour:', tip:'Only add each city the FIRST time we encounter it'},
+  {code:'      Tour.append(city)', tip:'Add to tour — skip if already visited (this is the shortcutting)'},
+  {code:'  Tour.append(Tour[0])', tip:'Return to start city to complete the cycle'},
+  {code:'  return Tour', tip:'Approximate tour — cost ≤ 2 × OPT (by triangle inequality + MST bound)'},
+];
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init(){
+  buildPseudo();
+  canvas.addEventListener('click', canvasClick);
+  loadPreset(0);
+}
+
+function buildPseudo(){
+  document.getElementById('pseudoBlock').innerHTML=PSEUDO.map((p,i)=>
+    `<div class="pseudo-line" id="pl${i}">
+      <span class="pseudo-num">${String(i+1).padStart(2)}</span>
+      <span class="pseudo-code">${esc(p.code)}</span>
+      <span class="tooltip">${p.tip}</span>
+    </div>`
+  ).join('');
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function canvasClick(e){
+  if(steps.length>0) return;
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width;
+  const scaleY=canvas.height/rect.height;
+  const x=Math.round((e.clientX-rect.left)*scaleX);
+  const y=Math.round((e.clientY-rect.top)*scaleY);
+  if(cities.length>=12) return;
+  cities.push({x,y});
+  document.getElementById('cntCities').textContent=cities.length;
+  drawCanvas({mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,phase:'init'});
+}
+
+function clearCities(){
+  cities=[]; steps=[];
+  document.getElementById('cntCities').textContent=0;
+  drawCanvas({mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,phase:'init'});
+  resetCounters(); setStatus('idle');
+  setButtons({build:true,step:false,play:false,pause:false,reset:false});
+  document.getElementById('stepExplain').innerHTML='<span style="color:var(--text3)">🎓 Place cities on the canvas, then click <strong>Build Steps</strong>.</span>';
+  document.getElementById('historyBody').innerHTML='';
+  document.getElementById('stepCurrent').textContent='0';
+  document.getElementById('stepTotal').textContent='0';
+  document.getElementById('resultBox').style.display='none';
+  clearCostBars();
+}
+
+function loadFromInput(){
+  const raw=document.getElementById('cityInput').value.trim();
+  if(!raw) return;
+  const parsed=raw.split(';').map(s=>{const [x,y]=s.split(',').map(Number);return{x,y};}).filter(c=>!isNaN(c.x)&&!isNaN(c.y));
+  if(parsed.length<2){alert('Need at least 2 valid cities (format: x,y;x,y;...)');return;}
+  cities=parsed.slice(0,12);
+  document.getElementById('cntCities').textContent=cities.length;
+  drawCanvas({mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,phase:'init'});
+}
+
+function loadPreset(i){
+  clearCities();
+  if(i===3){
+    // Random 8 cities
+    cities=Array.from({length:8},()=>({x:60+Math.floor(Math.random()*520),y:40+Math.floor(Math.random()*300)}));
+  } else {
+    cities=PRESETS[i].cities.map(c=>({...c}));
+  }
+  document.getElementById('cntCities').textContent=cities.length;
+  drawCanvas({mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,phase:'init'});
+}
+
+function updateSpeed(){
+  speedIdx=parseInt(document.getElementById('speedSlider').value);
+  document.getElementById('speedLabel').textContent=SPEEDS[speedIdx].toFixed(2).replace('.00','')+'×';
+}
+
+// ═══════════════════════════════════════════════════════
+// MATH
+// ═══════════════════════════════════════════════════════
+function dist(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);}
+
+function buildMSTPrim(cities){
+  const n=cities.length;
+  const inMST=new Array(n).fill(false);
+  const edges=[];
+  inMST[0]=true;
+  for(let iter=0;iter<n-1;iter++){
+    let best=null,bestDist=Infinity;
+    for(let u=0;u<n;u++){
+      if(!inMST[u]) continue;
+      for(let v=0;v<n;v++){
+        if(inMST[v]) continue;
+        const d=dist(cities[u],cities[v]);
+        if(d<bestDist){bestDist=d;best={u,v,d};}
+      }
+    }
+    if(best){edges.push(best);inMST[best.v]=true;}
+  }
+  return edges;
+}
+
+function buildMSTKruskal(cities){
+  const n=cities.length;
+  const allEdges=[];
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) allEdges.push({u:i,v:j,d:dist(cities[i],cities[j])});
+  allEdges.sort((a,b)=>a.d-b.d);
+  const parent=Array.from({length:n},(_,i)=>i);
+  function find(x){return parent[x]===x?x:parent[x]=find(parent[x]);}
+  const edges=[];
+  for(const e of allEdges){
+    if(edges.length===n-1) break;
+    const pu=find(e.u),pv=find(e.v);
+    if(pu!==pv){parent[pu]=pv;edges.push(e);}
+  }
+  return edges;
+}
+
+function buildAdjList(n,edges){
+  const adj=Array.from({length:n},()=>[]);
+  for(const e of edges){adj[e.u].push(e.v);adj[e.v].push(e.u);}
+  return adj;
+}
+
+function dfsOrder(adj,root,n){
+  const order=[];
+  const visited=new Array(n).fill(false);
+  function dfs(u){
+    visited[u]=true; order.push(u);
+    for(const v of adj[u]) if(!visited[v]) dfs(v);
+  }
+  dfs(root);
+  return order;
+}
+
+function tourCost(tour,cities){
+  let c=0;
+  for(let i=0;i<tour.length-1;i++) c+=dist(cities[tour[i]],cities[tour[i+1]]);
+  return c;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD STEPS
+// ═══════════════════════════════════════════════════════
+function buildSteps(){
+  if(cities.length<3){alert('Place at least 3 cities first.');return;}
+  const n=cities.length;
+  const algo=document.querySelector('input[name="mstAlgo"]:checked').value;
+  const mstEdges=algo==='prim'?buildMSTPrim(cities):buildMSTKruskal(cities);
+  const mstWeight=mstEdges.reduce((s,e)=>s+e.d,0);
+  const adj=buildAdjList(n,mstEdges);
+  const dfsVisit=dfsOrder(adj,0,n);
+  const tourOrder=[...dfsVisit,0];
+  const tCost=tourCost(tourOrder,cities);
+  const dfsCost=mstWeight*2;
+
+  steps=[];
+  let mstSoFar=[],dfsPathSoFar=[],tourSoFar=[],visitedSoFar=[];
+  let mstCnt=0,dfsCnt=0,shortcutCnt=0;
+
+  // Step 0: init
+  steps.push({type:'init',line:0,phase:'init',mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,
+    mstCnt:0,dfsCnt:0,shortcutCnt:0,mstWeight:0,dfsCost,tCost,
+    explain:`Setup: ${n} cities placed. We will build the MST using ${algo==='prim'?"Prim's":"Kruskal's"} algorithm, then do a DFS walk, then shortcut to get our approximate tour.`});
+
+  // MST steps
+  for(let i=0;i<mstEdges.length;i++){
+    const e=mstEdges[i];
+    mstSoFar=[...mstSoFar,e]; mstCnt++;
+    const runW=mstSoFar.reduce((s,x)=>s+x.d,0);
+    steps.push({type:'mst_edge',line:5,phase:'mst',
+      mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[],visitedCities:[e.u,e.v],currentCity:e.v,
+      mstCnt,dfsCnt,shortcutCnt,mstWeight:runW,dfsCost,tCost,
+      explain:`MST edge ${i+1}/${mstEdges.length}: connect city ${e.u} → city ${e.v} (distance ${e.d.toFixed(1)}). Running MST weight = ${runW.toFixed(1)}. ${algo==='prim'?'Prim: chose minimum-cost crossing edge.':'Kruskal: chose minimum global edge that doesn\'t create a cycle.'}`});
+  }
+
+  // MST done
+  steps.push({type:'mst_done',line:1,phase:'mst',
+    mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[],visitedCities:Array.from({length:n},(_,i)=>i),currentCity:-1,
+    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,
+    explain:`MST complete! ${n-1} edges, total weight = ${mstWeight.toFixed(1)}. This is our lower bound: OPT tour ≥ MST = ${mstWeight.toFixed(1)}. DFS walk will cost 2×${mstWeight.toFixed(1)} = ${(2*mstWeight).toFixed(1)}.`});
+
+  // DFS steps
+  for(let i=0;i<dfsVisit.length;i++){
+    const city=dfsVisit[i];
+    dfsPathSoFar=[...dfsPathSoFar,city]; dfsCnt++;
+    steps.push({type:'dfs_visit',line:6,phase:'dfs',
+      mstEdges:[...mstSoFar],dfsPath:[...dfsPathSoFar],tourEdges:[],visitedCities:[...dfsPathSoFar],currentCity:city,
+      mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,
+      explain:`DFS visit ${i+1}/${dfsVisit.length}: arrived at city ${city}. DFS walk traverses every MST edge twice — once going deep, once returning. Path so far: [${dfsPathSoFar.join(' → ')}].`});
+  }
+  steps.push({type:'dfs_done',line:7,phase:'dfs',
+    mstEdges:[...mstSoFar],dfsPath:[...dfsVisit,0],tourEdges:[],visitedCities:Array.from({length:n},(_,i)=>i),currentCity:0,
+    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
+    explain:`DFS walk complete. Full walk order: [${dfsVisit.join(' → ')} → 0 (back to start)]. Total walk cost ≈ 2×${mstWeight.toFixed(1)} = ${(2*mstWeight).toFixed(1)}. Now shortcut: keep only first visits.`});
+
+  // Shortcut / tour steps
+  const seen=new Set();
+  for(let i=0;i<dfsVisit.length;i++){
+    const city=dfsVisit[i];
+    if(!seen.has(city)){
+      seen.add(city); tourSoFar=[...tourSoFar,city]; shortcutCnt++;
+      const prevIdx=tourSoFar.length>1?tourSoFar[tourSoFar.length-2]:-1;
+      const tourEdgesNow=[];
+      for(let j=0;j<tourSoFar.length-1;j++) tourEdgesNow.push({u:tourSoFar[j],v:tourSoFar[j+1]});
+      const runT=tourCost([...tourSoFar,tourSoFar[0]].slice(0,tourSoFar.length>1?tourSoFar.length:1),cities);
+      steps.push({type:'shortcut',line:10,phase:'tour',
+        mstEdges:[...mstSoFar],dfsPath:[],tourEdges:tourEdgesNow,visitedCities:[...tourSoFar],currentCity:city,
+        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
+        explain:`Tour step ${shortcutCnt}/${n}: city ${city} is first visit — add to tour. Tour so far: [${tourSoFar.join(' → ')}]. Triangle inequality ensures this direct path ≤ any DFS detour.`});
+    } else {
+      steps.push({type:'skip',line:10,phase:'tour',
+        mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[...steps[steps.length-1].tourEdges||[]],visitedCities:[...tourSoFar],currentCity:city,
+        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
+        explain:`City ${city} already in tour — SKIP (shortcutting). This is where triangle inequality pays off: going directly to the next new city is ≤ cost of the detour back here.`});
+    }
+  }
+
+  // Close tour
+  const finalTourEdges=tourOrder.slice(0,tourOrder.length-1).map((_,i)=>({u:tourOrder[i],v:tourOrder[i+1]}));
+  const approxRatio=tCost/mstWeight;
+  steps.push({type:'done',line:12,phase:'tour',
+    mstEdges:[...mstSoFar],dfsPath:[],tourEdges:finalTourEdges,visitedCities:Array.from({length:n},(_,i)=>i),currentCity:0,
+    mstCnt,dfsCnt:n,shortcutCnt:n,mstWeight,dfsCost:2*mstWeight,tCost,approxRatio,
+    explain:`Tour complete! Return to start city 0. Approximate tour: [${tourOrder.join(' → ')}]. Tour cost = ${tCost.toFixed(1)}. 2×MST bound = ${(2*mstWeight).toFixed(1)}. Ratio = ${approxRatio.toFixed(3)}× (must be ≤ 2.0).`});
+
+  currentStep=-1;
+  document.getElementById('stepCurrent').textContent='0';
+  document.getElementById('stepTotal').textContent=steps.length;
+  document.getElementById('historyBody').innerHTML='';
+  document.getElementById('resultBox').style.display='none';
+  setStatus('ready');
+  setButtons({build:true,step:true,play:true,pause:false,reset:true});
+}
+
+// ═══════════════════════════════════════════════════════
+// CANVAS DRAWING
+// ═══════════════════════════════════════════════════════
+function drawCanvas(s){
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0a0e16'; ctx.fillRect(0,0,W,H);
+  if(!cities.length) return;
+
+  // MST edges
+  if(s.mstEdges) for(const e of s.mstEdges){
+    ctx.beginPath();
+    ctx.moveTo(cities[e.u].x,cities[e.u].y);
+    ctx.lineTo(cities[e.v].x,cities[e.v].y);
+    ctx.strokeStyle='#3b82f6'; ctx.lineWidth=2; ctx.globalAlpha=0.7;
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+
+  // DFS path
+  if(s.dfsPath&&s.dfsPath.length>1){
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(cities[s.dfsPath[0]].x,cities[s.dfsPath[0]].y);
+    for(let i=1;i<s.dfsPath.length;i++) ctx.lineTo(cities[s.dfsPath[i]].x,cities[s.dfsPath[i]].y);
+    ctx.strokeStyle='#f97316'; ctx.lineWidth=1.5; ctx.globalAlpha=0.6; ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+
+  // Tour edges
+  if(s.tourEdges) for(const e of s.tourEdges){
+    ctx.beginPath();
+    ctx.moveTo(cities[e.u].x,cities[e.u].y);
+    ctx.lineTo(cities[e.v].x,cities[e.v].y);
+    ctx.strokeStyle='#22c55e'; ctx.lineWidth=2.5; ctx.globalAlpha=0.9;
+    ctx.stroke(); ctx.globalAlpha=1;
+    // Arrow
+    const angle=Math.atan2(cities[e.v].y-cities[e.u].y,cities[e.v].x-cities[e.u].x);
+    const mx=(cities[e.u].x+cities[e.v].x)/2, my=(cities[e.u].y+cities[e.v].y)/2;
+    ctx.beginPath();
+    ctx.moveTo(mx+8*Math.cos(angle-0.4),my+8*Math.sin(angle-0.4));
+    ctx.lineTo(mx+12*Math.cos(angle),my+12*Math.sin(angle));
+    ctx.lineTo(mx+8*Math.cos(angle+0.4),my+8*Math.sin(angle+0.4));
+    ctx.strokeStyle='#22c55e'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
+  // Edge weight labels for MST (small, only if few cities)
+  if(s.mstEdges&&cities.length<=8){
+    for(const e of s.mstEdges){
+      const mx=(cities[e.u].x+cities[e.v].x)/2;
+      const my=(cities[e.u].y+cities[e.v].y)/2;
+      ctx.fillStyle='rgba(14,20,32,0.8)';
+      ctx.fillRect(mx-14,my-9,28,14);
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 10px monospace'; ctx.textAlign='center';
+      ctx.fillText(e.d.toFixed(0),mx,my+4);
+    }
+  }
+
+  // Cities
+  for(let i=0;i<cities.length;i++){
+    const c=cities[i];
+    const inTour=s.visitedCities&&s.visitedCities.includes(i);
+    const isCurrent=s.currentCity===i;
+    const isMstPhase=s.phase==='mst'||s.phase==='init';
+
+    // Glow for current
+    if(isCurrent){
+      ctx.beginPath(); ctx.arc(c.x,c.y,18,0,Math.PI*2);
+      ctx.fillStyle='rgba(249,115,22,0.2)'; ctx.fill();
+    }
+
+    ctx.beginPath(); ctx.arc(c.x,c.y,10,0,Math.PI*2);
+    ctx.fillStyle=isCurrent?'#f97316':inTour?'#22c55e':'#3b82f6';
+    ctx.globalAlpha=0.85; ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle=isCurrent?'#fed7aa':inTour?'#86efac':'#93c5fd';
+    ctx.lineWidth=1.5; ctx.stroke();
+
+    // Label
+    ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(i,c.x,c.y+4);
+
+    // Coord label (small, on hover conceptually — shown always for small sets)
+    if(cities.length<=8){
+      ctx.fillStyle='#64748b'; ctx.font='9px sans-serif';
+      ctx.fillText(`(${c.x},${c.y})`,c.x,c.y+22);
+    }
+  }
+  ctx.textAlign='left';
+}
+
+// ═══════════════════════════════════════════════════════
+// APPLY STEP
+// ═══════════════════════════════════════════════════════
+function applyStep(i){
+  if(i<0||i>=steps.length) return;
+  const s=steps[i];
+  document.getElementById('stepCurrent').textContent=i+1;
+  document.getElementById('cntMST').textContent=s.mstCnt;
+  document.getElementById('cntDFS').textContent=s.dfsCnt;
+  document.getElementById('cntShortcut').textContent=s.shortcutCnt;
+
+  // Pseudo highlight
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  const pl=document.getElementById('pl'+s.line);
+  if(pl){pl.classList.add('active');pl.scrollIntoView({block:'nearest',behavior:'smooth'});}
+
+  // Phase badge
+  const phMap={init:'Setup',mst:'Phase 1 — Build MST',dfs:'Phase 2 — DFS Walk',tour:'Phase 3 — Shortcut Tour'};
+  const phClass={init:'ph-init',mst:'ph-mst',dfs:'ph-dfs',tour:'ph-tour'}[s.phase]||'ph-init';
+  document.getElementById('stepExplain').innerHTML=`<span class="phase-badge ${phClass}">${phMap[s.phase]||s.phase}</span><br>${s.explain}`;
+  triggerMotion(document.getElementById('stepExplain'), 'motion-pulse');
+
+  // Draw canvas
+  drawCanvas(s);
+
+  // Cost bars
+  updateCostBars(s);
+
+  // Result
+  if(s.type==='done'){
+    renderResult(s);
+    setStatus('done');
+    setButtons({build:true,step:false,play:false,pause:false,reset:true});
+  }
+
+  addHistory(i,s);
+}
+
+function updateCostBars(s){
+  const maxVal=Math.max(s.dfsCost||1, s.tCost||0, s.mstWeight||0)*1.2;
+  const setBar=(id,val,maxV)=>{
+    document.getElementById('bar'+id).style.width=val?(val/maxV*100).toFixed(1)+'%':'0%';
+    document.getElementById('val'+id).textContent=val?val.toFixed(1):'—';
+  };
+  setBar('MST',s.mstWeight,maxVal);
+  setBar('DFS',s.phase!=='mst'&&s.phase!=='init'?s.dfsCost:0,maxVal);
+  setBar('Tour',s.tourEdges&&s.tourEdges.length?s.tCost:0,maxVal);
+  setBar('2MST',s.mstWeight?s.mstWeight*2:0,maxVal);
+  if(s.approxRatio) document.getElementById('approxRatio').textContent=s.approxRatio.toFixed(3)+'× OPT';
+}
+
+function clearCostBars(){
+  ['MST','DFS','Tour','2MST'].forEach(id=>{
+    document.getElementById('bar'+id).style.width='0%';
+    document.getElementById('val'+id).textContent='—';
+  });
+  document.getElementById('approxRatio').textContent='—';
+}
+
+function renderResult(s){
+  const box=document.getElementById('resultBox');
+  box.style.display='block';
+  const pass=s.tCost<=s.mstWeight*2+0.01;
+  box.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:10px">✓ Approximation Complete</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;margin-bottom:10px">
+      <div style="text-align:center"><div style="color:var(--text3)">MST weight</div><div style="font-size:18px;font-weight:700;color:var(--mst)">${s.mstWeight.toFixed(1)}</div></div>
+      <div style="text-align:center"><div style="color:var(--text3)">Tour cost</div><div style="font-size:18px;font-weight:700;color:var(--tour)">${s.tCost.toFixed(1)}</div></div>
+      <div style="text-align:center"><div style="color:var(--text3)">2× bound</div><div style="font-size:18px;font-weight:700;color:var(--yellow)">${(s.mstWeight*2).toFixed(1)}</div></div>
+    </div>
+    <div style="font-size:13px;color:var(--text2)">Approximation ratio: <strong style="color:var(--green)">${s.approxRatio.toFixed(3)}×</strong> &nbsp;|&nbsp; Tour ≤ 2×MST: <strong style="color:${pass?'var(--green)':'var(--red)'}">${pass?'✓ HOLDS':'✗ ERROR'}</strong></div>`;
+}
+
+function addHistory(i,s){
+  const tbody=document.getElementById('historyBody');
+  const tr=document.createElement('tr');
+  tr.dataset.step=i;
+  const phLabel={init:'Init',mst:'MST',dfs:'DFS',tour:'Tour'}[s.phase]||s.phase;
+  const costInfo=s.mstWeight?s.mstWeight.toFixed(1):'—';
+  tr.innerHTML=`<td>${i+1}</td><td>${phLabel}</td><td>${s.type.replace(/_/g,' ')}</td><td style="font-family:monospace">${costInfo}</td>`;
+  tr.addEventListener('click',()=>jumpToStep(parseInt(tr.dataset.step)));
+  tbody.insertBefore(tr,tbody.firstChild);
+  while(tbody.rows.length>30) tbody.deleteRow(tbody.rows.length-1);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.remove('current-row'));
+  tr.classList.add('current-row');
+  triggerMotion(tr, 'motion-flash');
+}
+
+function jumpToStep(i){
+  if(i<0||i>=steps.length) return;
+  pausePlay(); currentStep=i; applyStep(i);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.toggle('current-row',parseInt(r.dataset.step)===i));
+}
+
+function stepForward(){
+  if(currentStep<steps.length-1){
+    currentStep++; applyStep(currentStep);
+    if(currentStep===steps.length-1){setStatus('done');setButtons({build:true,step:false,play:false,pause:false,reset:true});}
+  }
+}
+
+function startPlay(){
+  if(isPlaying||currentStep>=steps.length-1) return;
+  isPlaying=true; setStatus('playing');
+  setButtons({build:false,step:false,play:false,pause:true,reset:false});
+  playInterval=setInterval(()=>{
+    if(currentStep<steps.length-1){currentStep++;applyStep(currentStep);}
+    else{pausePlay();setStatus('done');setButtons({build:true,step:false,play:false,pause:false,reset:true});}
+  },BASE_DELAY/SPEEDS[speedIdx]);
+}
+
+function pausePlay(){
+  isPlaying=false;
+  if(playInterval){clearInterval(playInterval);playInterval=null;}
+  if(steps.length&&currentStep>=0&&currentStep<steps.length-1){setStatus('paused');setButtons({build:true,step:true,play:true,pause:false,reset:true});}
+}
+
+function resetViz(){
+  pausePlay(); steps=[]; currentStep=-1; resetCounters();
+  setStatus('idle');
+  setButtons({build:true,step:false,play:false,pause:false,reset:false});
+  document.getElementById('stepExplain').innerHTML='<span style="color:var(--text3)">🎓 Place cities on the canvas, then click <strong>Build Steps</strong>.</span>';
+  document.getElementById('historyBody').innerHTML='';
+  document.getElementById('stepCurrent').textContent='0';
+  document.getElementById('stepTotal').textContent='0';
+  document.getElementById('resultBox').style.display='none';
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  clearCostBars();
+  drawCanvas({mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,phase:'init'});
+}
+
+function resetCounters(){
+  document.getElementById('cntMST').textContent='0';
+  document.getElementById('cntDFS').textContent='0';
+  document.getElementById('cntShortcut').textContent='0';
+}
+
+function setStatus(s){const el=document.getElementById('statusBadge');el.className='status-badge status-'+s;el.textContent=s.charAt(0).toUpperCase()+s.slice(1);triggerMotion(el,'motion-pulse');}
+function setButtons(c){['Build','Step','Play','Pause','Reset'].forEach(n=>{document.getElementById('btn'+n).disabled=!c[n.toLowerCase()];});}
+function toggleCollapse(id){const body=document.getElementById('body-'+id);const arrow=document.getElementById('arrow-'+id);const isOpen=body.style.maxHeight!=='0px'&&body.style.maxHeight!=='';if(isOpen){body.style.maxHeight='0';body.style.overflow='hidden';arrow.classList.remove('open');}else{body.style.maxHeight=body.scrollHeight+3000+'px';body.style.overflow='visible';arrow.classList.add('open');}}
+
+function triggerMotion(el, cls){
+  if(!el || reduceMotion) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+  el.addEventListener('animationend', ()=>el.classList.remove(cls), {once:true});
+}
+
+init();
+setButtons({build:true,step:false,play:false,pause:false,reset:false});
+</script>
+</body>
+</html>

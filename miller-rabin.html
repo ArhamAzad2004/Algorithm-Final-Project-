@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Miller-Rabin Primality Testing — BSD 404 CLO-3</title>
+<style>
+:root {
+  --bg:#0f1117; --bg2:#161b25; --bg3:#1e2535; --bg4:#252d3e;
+  --border:#2e3a50; --text:#e2e8f0; --text2:#94a3b8; --text3:#64748b;
+  --accent:#3b82f6; --green:#22c55e; --orange:#f97316; --purple:#a855f7;
+  --yellow:#eab308; --red:#ef4444; --teal:#14b8a6; --pink:#ec4899;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:10;}
+.header-title{font-size:18px;font-weight:700;}
+.header-sub{font-size:12px;color:var(--text2);}
+.clo-badge{background:var(--purple);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+.main{display:flex;min-height:calc(100vh - 56px);}
+.panel-left{width:420px;min-width:420px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;}
+.panel-right{flex:1;padding:16px;display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px;}
+input[type=text],input[type=number]{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s;}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--accent);}
+input.valid{border-color:var(--green);}
+input.invalid{border-color:var(--red);}
+.input-hint{font-size:11px;color:var(--text3);margin-top:3px;}
+.preset-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.btn-preset{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.btn-preset:hover{background:var(--bg3);border-color:var(--accent);color:var(--text);}
+.btn-preset.carmichael{border-color:var(--orange);color:var(--orange);}
+.btn-preset.carmichael:hover{background:rgba(249,115,22,.1);}
+.speed-row{display:flex;align-items:center;gap:10px;}
+.speed-row span{font-size:12px;color:var(--text2);white-space:nowrap;}
+input[type=range]{flex:1;accent-color:var(--accent);}
+.speed-val{font-size:12px;color:var(--accent);font-weight:600;min-width:34px;text-align:right;}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+.btn{border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#2563eb;}
+.btn-secondary{background:var(--bg4);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--bg3);border-color:var(--accent);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px 10px;}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:2px;}
+.stat-val{font-size:16px;font-weight:700;}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;}
+.status-idle{background:#1e2535;color:var(--text2);}
+.status-ready{background:#1a2e1a;color:var(--green);}
+.status-playing{background:#1a2040;color:var(--accent);}
+.status-paused{background:#2a2010;color:var(--yellow);}
+.status-done{background:#1a2e2a;color:var(--teal);}
+/* PSEUDOCODE */
+.pseudo-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow-y:auto;max-height:320px;}
+.pseudo-line{display:flex;align-items:flex-start;padding:3px 10px;font-family:'Courier New',monospace;font-size:12px;color:var(--text2);cursor:pointer;position:relative;transition:background .15s;}
+.pseudo-line:hover{background:var(--bg3);}
+.pseudo-line.active{background:rgba(168,85,247,.2);color:var(--text);border-left:3px solid var(--purple);}
+.pseudo-num{color:var(--text3);min-width:22px;margin-right:8px;user-select:none;font-size:11px;padding-top:1px;}
+.pseudo-code{flex:1;white-space:pre;}
+.pseudo-line .tooltip{display:none;position:absolute;left:100%;top:0;z-index:99;background:#1a1a2e;border:1px solid var(--purple);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);min-width:200px;max-width:300px;white-space:normal;pointer-events:none;}
+.pseudo-line:hover .tooltip{display:block;}
+/* KEY CONCEPT */
+.key-concept{border-left:3px solid var(--yellow);background:rgba(234,179,8,.07);padding:10px 14px;border-radius:0 6px 6px 0;margin:8px 0;}
+.key-concept-title{font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:4px;}
+.key-concept p{font-size:12px;color:var(--text2);}
+/* STEP EXPLAIN */
+.step-explain{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:12px;min-height:64px;font-size:13px;color:var(--text);line-height:1.6;}
+.phase-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-bottom:6px;}
+.ph-decomp{background:rgba(59,130,246,.2);color:var(--accent);}
+.ph-modpow{background:rgba(20,184,166,.2);color:var(--teal);}
+.ph-chain{background:rgba(168,85,247,.2);color:var(--purple);}
+.ph-result-prime{background:rgba(34,197,94,.2);color:var(--green);}
+.ph-result-comp{background:rgba(239,68,68,.2);color:var(--red);}
+.ph-fermat{background:rgba(249,115,22,.2);color:var(--orange);}
+/* HISTORY */
+.history-table-wrap{max-height:200px;overflow-y:auto;border-radius:6px;border:1px solid var(--border);}
+.history-table{width:100%;border-collapse:collapse;font-size:12px;}
+.history-table th{background:var(--bg4);color:var(--text2);font-weight:600;padding:6px 8px;text-align:left;position:sticky;top:0;font-size:11px;border-bottom:1px solid var(--border);}
+.history-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.5);color:var(--text2);}
+.history-table tr:hover td{background:var(--bg4);color:var(--text);cursor:pointer;}
+.history-table tr.current-row td{background:rgba(168,85,247,.15);color:var(--text);}
+/* SQUARING CHAIN VISUAL */
+.chain-wrap{display:flex;align-items:center;gap:0;overflow-x:auto;padding:4px 0;}
+.chain-node{min-width:64px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);text-align:center;font-size:12px;font-family:'Courier New',monospace;transition:all .3s;flex-shrink:0;}
+.chain-node .cn-exp{font-size:10px;color:var(--text3);margin-bottom:2px;}
+.chain-node .cn-val{font-weight:700;font-size:13px;}
+.chain-arrow{color:var(--text3);font-size:16px;padding:0 4px;flex-shrink:0;}
+.cn-idle{background:var(--bg4);border-color:var(--border);color:var(--text2);}
+.cn-active{background:rgba(168,85,247,.15);border-color:var(--purple);color:var(--text);}
+.cn-pass{background:rgba(34,197,94,.15);border-color:var(--green);}
+.cn-pass .cn-val{color:var(--green);}
+.cn-fail{background:rgba(239,68,68,.15);border-color:var(--red);}
+.cn-fail .cn-val{color:var(--red);}
+.cn-minus1{background:rgba(20,184,166,.15);border-color:var(--teal);}
+.cn-minus1 .cn-val{color:var(--teal);}
+/* DECOMPOSE VISUAL */
+.decomp-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;}
+.decomp-bit{width:32px;height:32px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:monospace;transition:all .3s;}
+.decomp-bit.two{background:rgba(59,130,246,.2);border:1px solid var(--accent);color:var(--accent);}
+.decomp-bit.odd{background:rgba(34,197,94,.2);border:1px solid var(--green);color:var(--green);}
+.decomp-bit.dim{background:var(--bg4);border:1px solid var(--border);color:var(--text3);}
+/* MODPOW STEPS */
+.modpow-table{width:100%;border-collapse:collapse;font-size:12px;}
+.modpow-table th{background:var(--bg4);padding:5px 8px;color:var(--text2);text-align:left;border-bottom:1px solid var(--border);font-size:11px;}
+.modpow-table td{padding:4px 8px;border-bottom:1px solid rgba(46,58,80,.4);font-family:'Courier New',monospace;color:var(--text2);}
+.modpow-table tr.active-row td{background:rgba(20,184,166,.1);color:var(--text);}
+/* ROUND BADGES */
+.rounds-wrap{display:flex;gap:8px;flex-wrap:wrap;}
+.round-badge{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text2);}
+.round-badge.prime{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);}
+.round-badge.composite{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red);}
+.round-badge.testing{background:rgba(59,130,246,.15);border-color:var(--accent);color:var(--accent);}
+/* FERMAT COMPARE */
+.fermat-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fermat-box{border-radius:6px;padding:10px;border:1px solid var(--border);}
+.fermat-box-title{font-size:11px;font-weight:700;margin-bottom:6px;text-transform:uppercase;}
+/* WORKED EXAMPLE TABLE */
+.worked-table{width:100%;border-collapse:collapse;font-size:12px;}
+.worked-table th{background:var(--bg4);padding:6px 8px;color:var(--text2);font-weight:600;text-align:left;border-bottom:1px solid var(--border);}
+.worked-table td{padding:5px 8px;border-bottom:1px solid rgba(46,58,80,.4);color:var(--text2);font-family:'Courier New',monospace;}
+.worked-table tr.highlight td{color:var(--green);font-weight:600;}
+.worked-table tr.fail td{color:var(--red);}
+/* COLLAPSIBLE */
+.collapsible-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:10px 0;user-select:none;}
+.collapsible-header h3{font-size:13px;font-weight:600;color:var(--text);}
+.collapsible-arrow{color:var(--text3);font-size:11px;transition:transform .2s;}
+.collapsible-arrow.open{transform:rotate(180deg);}
+.collapsible-body{transition:max-height .3s ease;}
+.section-text{font-size:13px;color:var(--text2);line-height:1.7;}
+.section-text p{margin-bottom:8px;}
+/* LECTURE */
+.lecture-section{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 18px;}
+.lecture-h3{font-size:14px;font-weight:700;color:var(--text);margin:14px 0 6px;}
+.lecture-code{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:'Courier New',monospace;font-size:12px;color:#7dd3fc;overflow-x:auto;white-space:pre;margin:8px 0;line-height:1.7;}
+.lecture-table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;}
+.lecture-table th{background:var(--bg4);padding:6px 10px;color:var(--text2);text-align:left;border-bottom:1px solid var(--border);}
+.lecture-table td{padding:5px 10px;border-bottom:1px solid rgba(46,58,80,.4);color:var(--text2);}
+/* RESULT */
+.result-box-prime{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:14px;}
+.result-box-comp{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:14px;}
+.notice{font-size:11px;color:var(--text3);background:var(--bg4);padding:6px 10px;border-radius:5px;border-left:2px solid var(--text3);}
+/* CONFIDENCE BAR */
+.conf-bar-wrap{background:var(--bg4);border-radius:4px;height:10px;overflow:hidden;margin-top:6px;}
+.conf-bar{height:100%;border-radius:4px;background:var(--green);transition:width .5s ease;}
+/* RSA PANEL */
+.rsa-panel{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.rsa-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(46,58,80,.3);font-size:13px;}
+.rsa-label{color:var(--text2);}
+.rsa-val{font-family:'Courier New',monospace;color:var(--text);font-size:13px;}
+select{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;width:100%;}
+
+@keyframes pulseGlow{
+  0%{box-shadow:0 0 0 rgba(168,85,247,0);transform:translateY(0);}
+  50%{box-shadow:0 0 0 6px rgba(168,85,247,0.16);transform:translateY(-1px);}
+  100%{box-shadow:0 0 0 rgba(168,85,247,0);transform:translateY(0);}
+}
+
+@keyframes fadeFlash{
+  0%{background:rgba(168,85,247,.3);}
+  100%{background:transparent;}
+}
+
+.motion-pulse{animation:pulseGlow .45s ease;}
+.motion-flash{animation:fadeFlash .5s ease;}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation:none !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
+@media(max-width:980px){.main{flex-direction:column;}.panel-left{width:100%;min-width:0;border-right:none;border-bottom:1px solid var(--border);}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Miller-Rabin Primality Testing</div>
+    <div class="header-sub">BSD 404 — Algorithms II &nbsp;|&nbsp; Dr. Arash Kermani &nbsp;|&nbsp; Interactive Teaching Tool</div>
+  </div>
+  <span class="clo-badge">CLO-3</span>
+</div>
+
+<div class="main">
+<!-- ═══ LEFT PANEL ═══ -->
+<div class="panel-left">
+
+  <div class="card">
+    <div class="card-title">Number to Test</div>
+    <label>Enter n (odd integer ≥ 3)</label>
+    <input type="text" id="inputN" value="221" placeholder="e.g. 221">
+    <div class="input-hint" id="hintN">221 = 13 × 17 (composite)</div>
+    <div style="margin-top:10px">
+      <label>Witness rounds (k)</label>
+      <input type="number" id="inputK" value="3" min="1" max="10" style="width:80px">
+      <span style="font-size:12px;color:var(--text3);margin-left:8px">Error ≤ 4⁻ᵏ</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Quick Examples</div>
+    <div class="preset-grid">
+      <button class="btn-preset" onclick="loadPreset(17)">17 (prime)</button>
+      <button class="btn-preset" onclick="loadPreset(221)">221 = 13×17</button>
+      <button class="btn-preset" onclick="loadPreset(97)">97 (prime)</button>
+      <button class="btn-preset" onclick="loadPreset(341)">341 (composite)</button>
+      <button class="btn-preset" onclick="loadPreset(7919)">7919 (prime)</button>
+      <button class="btn-preset carmichael" onclick="loadPreset(561)">561 — Carmichael ⚠</button>
+      <button class="btn-preset carmichael" onclick="loadPreset(1105)">1105 — Carmichael ⚠</button>
+      <button class="btn-preset" onclick="loadPreset(104729)">104729 (prime)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Speed</div>
+    <div class="speed-row">
+      <span>0.25×</span>
+      <input type="range" id="speedSlider" min="0" max="4" step="1" value="2" oninput="updateSpeed()">
+      <span>4×</span>
+      <span class="speed-val" id="speedLabel">1.0×</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Playback Controls</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnBuild" onclick="buildSteps()">Build Steps</button>
+      <button class="btn btn-secondary" id="btnStep" onclick="stepForward()" disabled>Step</button>
+      <button class="btn btn-secondary" id="btnPlay" onclick="startPlay()" disabled>Play</button>
+      <button class="btn btn-secondary" id="btnPause" onclick="pausePlay()" disabled>Pause</button>
+      <button class="btn btn-secondary" id="btnReset" onclick="resetAll()" disabled>Reset</button>
+    </div>
+    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:13px;color:var(--text2)">Step <span id="stepCurrent" style="color:var(--text);font-weight:700">0</span> / <span id="stepTotal">0</span></div>
+      <span class="status-badge status-idle" id="statusBadge">Idle</span>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text3)">💡 Try <strong>561 (Carmichael)</strong> to see Fermat fail but Miller-Rabin succeed.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Live Counters</div>
+    <div class="status-grid">
+      <div class="stat-box"><div class="stat-label">Round</div><div class="stat-val" id="cntRound" style="color:var(--accent)">0</div></div>
+      <div class="stat-box"><div class="stat-label">Mod Multiplications</div><div class="stat-val" id="cntModMult" style="color:var(--teal)">0</div></div>
+      <div class="stat-box"><div class="stat-label">Confidence</div><div class="stat-val" id="cntConf" style="color:var(--green);font-size:13px">Untested</div></div>
+      <div class="stat-box"><div class="stat-label">Squarings</div><div class="stat-val" id="cntSquare" style="color:var(--purple)">0</div></div>
+    </div>
+    <div style="margin-top:8px;">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">Certainty after k rounds</div>
+      <div class="conf-bar-wrap"><div class="conf-bar" id="confBar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Pseudocode <span style="font-size:10px;color:var(--text3)">(hover for tooltip)</span></div>
+    <div class="pseudo-block" id="pseudoBlock"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step Explanation</div>
+    <div class="step-explain" id="stepExplain"><span style="color:var(--text3)">🎓 Click <strong>Build Steps</strong>, then <strong>Step</strong> or <strong>Play</strong> to trace the algorithm step by step.</span></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Step History <span style="font-size:10px;color:var(--text3)">(click row to jump)</span></div>
+    <div class="history-table-wrap">
+      <table class="history-table" id="historyTable">
+        <thead><tr><th>#</th><th>Phase</th><th>Action</th><th>Value</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end left -->
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<div class="panel-right">
+
+  <!-- DECOMPOSE SECTION -->
+  <div class="card">
+    <div class="card-title">Step 1 — Decompose n−1 = 2ˢ · d</div>
+    <div id="decompDisplay" style="color:var(--text3);font-size:13px">Build steps to see decomposition.</div>
+    <div class="decomp-row" id="decompBits"></div>
+    <div id="decompResult" style="font-size:14px;font-family:'Courier New',monospace;margin-top:4px;color:var(--text2)"></div>
+  </div>
+
+  <!-- MODPOW SECTION -->
+  <div class="card">
+    <div class="card-title">Step 2 — Square-and-Multiply: computing a<sup>d</sup> mod n</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px" id="modpowCaption">Each bit of exponent d drives one square + optional multiply. This is how a^d mod n is computed in O(log d) steps — not d steps.</div>
+    <div style="overflow-x:auto">
+      <table class="modpow-table" id="modpowTable">
+        <thead><tr><th>Bit of d</th><th>Action</th><th>base</th><th>result</th><th>exp</th></tr></thead>
+        <tbody id="modpowBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SQUARING CHAIN -->
+  <div class="card">
+    <div class="card-title">Step 3 — Squaring Chain: a<sup>d</sup> → a<sup>2d</sup> → … → a<sup>n−1</sup> mod n</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Each node is squared from the previous. We look for −1 (≡ n−1) before hitting 1. Finding it means prime-consistent. Hitting 1 without seeing −1 first means COMPOSITE.</div>
+    <div class="chain-wrap" id="chainWrap"></div>
+    <div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;font-size:11px;">
+      <span style="color:var(--green)">■ = 1 (passes immediately)</span>
+      <span style="color:var(--teal)">■ = n−1 (found −1, passes)</span>
+      <span style="color:var(--red)">■ = composite detected</span>
+      <span style="color:var(--purple)">■ = currently active</span>
+    </div>
+  </div>
+
+  <!-- WITNESS ROUNDS -->
+  <div class="card">
+    <div class="card-title">Witness Rounds — Cumulative Results</div>
+    <div class="rounds-wrap" id="roundsWrap"><span style="font-size:12px;color:var(--text3)">Run Build Steps to see witness results.</span></div>
+  </div>
+
+  <!-- RESULT BOX -->
+  <div id="resultBox" style="display:none"></div>
+
+  <!-- FERMAT COMPARISON -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('fermat')">
+      <h3>⚔️ Fermat's Test vs Miller-Rabin — Side by Side</h3>
+      <span class="collapsible-arrow open" id="arrow-fermat">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-fermat" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:10px">
+        <div class="fermat-compare">
+          <div class="fermat-box" style="border-color:var(--orange)">
+            <div class="fermat-box-title" style="color:var(--orange)">Fermat's Test</div>
+            <div style="font-size:12px;color:var(--text2)">Check: a^(n−1) ≡ 1 (mod n)<br>If ≠ 1 → definitely composite<br>If = 1 → probably prime</div>
+            <div id="fermatResult" style="margin-top:8px;font-size:13px;font-family:monospace;color:var(--text3)">—</div>
+            <div class="key-concept" style="margin-top:8px;border-left-color:var(--red);background:rgba(239,68,68,.07)">
+              <div class="key-concept-title" style="color:var(--red)">Fatal Weakness</div>
+              <p>Carmichael numbers (561, 1105, 1729…) pass Fermat for ALL witnesses. Fermat cannot detect them.</p>
+            </div>
+          </div>
+          <div class="fermat-box" style="border-color:var(--purple)">
+            <div class="fermat-box-title" style="color:var(--purple)">Miller-Rabin</div>
+            <div style="font-size:12px;color:var(--text2)">Also checks the square root chain. Looks for non-trivial √1.<br>Each round: ≥ 75% chance of catching composite.</div>
+            <div id="mrResult" style="margin-top:8px;font-size:13px;font-family:monospace;color:var(--text3)">—</div>
+            <div class="key-concept" style="margin-top:8px">
+              <div class="key-concept-title">Catches Carmichael Numbers</div>
+              <p>For n=561: Fermat says prime for all witnesses. Miller-Rabin finds non-trivial √1 in the squaring chain → correctly says COMPOSITE.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKED EXAMPLE -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('worked')">
+      <h3>📐 Fully Worked Example: n = 221, witness a = 2</h3>
+      <span class="collapsible-arrow" id="arrow-worked">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-worked" style="max-height:0;overflow:hidden">
+      <div style="padding-top:10px">
+        <p class="section-text" style="margin-bottom:8px">We test <strong>n = 221 = 13 × 17</strong> (composite) with witness <strong>a = 2</strong>.</p>
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Step 1: Decompose n−1 = 2ˢ · d</div>
+          <p>n−1 = 220. Divide by 2 repeatedly: 220 → 110 → 55 (odd). So s = 2, d = 55. We write 220 = 2² × 55.</p>
+        </div>
+        <div class="key-concept" style="margin-top:8px;border-left-color:var(--teal);background:rgba(20,184,166,.07)">
+          <div class="key-concept-title" style="color:var(--teal)">🔑 Step 2: Compute a^d = 2^55 mod 221 via Square-and-Multiply</div>
+          <p>Binary of 55 = 110111. Process each bit: start result=1, base=2. For each '1' bit: result = result × base mod 221. For each bit: base = base² mod 221. Result = 137.</p>
+        </div>
+        <table class="worked-table" style="margin-top:10px">
+          <thead><tr><th>r</th><th>Compute</th><th>Value mod 221</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>x = 2^55</td><td>Square-and-Multiply</td><td>137</td><td>Not 1 or 220, continue</td></tr>
+            <tr><td>r=1: x²</td><td>137² mod 221</td><td>47</td><td>Not 220, continue</td></tr>
+            <tr class="fail"><td>r=2: x²</td><td>47² mod 221</td><td>1 (reached 1!)</td><td>COMPOSITE — hit 1 without seeing 220</td></tr>
+          </tbody>
+        </table>
+        <div class="key-concept" style="margin-top:10px;border-left-color:var(--red);background:rgba(239,68,68,.07)">
+          <div class="key-concept-title" style="color:var(--red)">🔑 Why is this COMPOSITE?</div>
+          <p>We squared up to a^(n−1) = 1. But we never saw −1 (= 220 mod 221) on the way. This means we found a non-trivial square root of 1: 47² ≡ 1 (mod 221) but 47 ≢ ±1. Only possible in composite rings. QED: 221 is composite.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY CONCEPTS -->
+  <div class="card">
+    <div class="collapsible-header" onclick="toggleCollapse('concepts')">
+      <h3>💡 Key Concepts</h3>
+      <span class="collapsible-arrow open" id="arrow-concepts">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-concepts" style="max-height:2000px;overflow:visible">
+      <div style="padding-top:8px;display:flex;flex-direction:column;gap:10px">
+        <div class="key-concept">
+          <div class="key-concept-title">🔑 Non-Trivial Square Root of 1</div>
+          <p>In prime fields, x² ≡ 1 (mod p) implies x ≡ ±1. In composite rings, other solutions exist. Finding one (a number that squares to 1 but isn't ±1) proves compositeness. This is Miller-Rabin's core insight that Fermat lacks.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--teal);background:rgba(20,184,166,.07)">
+          <div class="key-concept-title" style="color:var(--teal)">🔑 Why n−1 = 2ˢ · d?</div>
+          <p>Since n is odd, n−1 is even. Factoring out all 2s gives us s squarings to check. Each squaring is a chance to find a non-trivial √1. The chain a^d → a^(2d) → … → a^(n−1) must hit −1 at some point if n is prime.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--purple);background:rgba(168,85,247,.07)">
+          <div class="key-concept-title" style="color:var(--purple)">🔑 Error Probability = 4⁻ᵏ</div>
+          <p>For any composite n, at least 3/4 of all possible witnesses will detect it in one round. After k rounds with random witnesses: probability of false "prime" ≤ (1/4)^k. At k=40: probability ≈ 10⁻²⁴ — negligible.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--orange);background:rgba(249,115,22,.07)">
+          <div class="key-concept-title" style="color:var(--orange)">🔑 Carmichael Numbers (561, 1105, 1729…)</div>
+          <p>These composite numbers satisfy a^(n−1) ≡ 1 for ALL valid witnesses a. Fermat's test is completely fooled. Miller-Rabin detects them because even though a^(n−1) ≡ 1, the squaring chain reveals a non-trivial √1 along the way.</p>
+        </div>
+        <div class="key-concept" style="border-left-color:var(--green);background:rgba(34,197,94,.07)">
+          <div class="key-concept-title" style="color:var(--green)">🔑 Square-and-Multiply is O(log d)</div>
+          <p>Computing a^d mod n naïvely needs d multiplications. Square-and-multiply processes one bit of d per iteration: square always, multiply if bit = 1. For a 2048-bit exponent: ~2048 squarings vs 2^2048 naïve multiplications.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RSA PANEL -->
+  <div class="rsa-panel">
+    <div class="collapsible-header" onclick="toggleCollapse('rsa')">
+      <h3>🔐 RSA Key Generation Demo (Miller-Rabin in action)</h3>
+      <span class="collapsible-arrow" id="arrow-rsa">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-rsa" style="max-height:0;overflow:hidden">
+      <div style="padding-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <label>Demo key size</label>
+            <select id="rsaBits">
+              <option value="12">12-bit modulus (fast demo)</option>
+              <option value="14" selected>14-bit modulus</option>
+              <option value="16">16-bit modulus</option>
+            </select>
+          </div>
+          <div>
+            <label>Public exponent e</label>
+            <select id="rsaE">
+              <option value="3">3</option>
+              <option value="17">17</option>
+              <option value="65537" selected>65537</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label>Message m (integer)</label>
+          <input type="number" id="rsaM" value="42" min="1">
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="rsaGenKeys()">Generate Keys</button>
+          <button class="btn btn-secondary" id="btnEncrypt" onclick="rsaEncrypt()" disabled>Encrypt</button>
+          <button class="btn btn-secondary" id="btnDecrypt" onclick="rsaDecrypt()" disabled>Decrypt</button>
+        </div>
+        <div style="margin-top:12px" id="rsaLog"></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text3)">⚠ Demo uses tiny key sizes — intentionally insecure. Real RSA uses 2048+ bit moduli.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LECTURE NOTES -->
+  <div class="lecture-section">
+    <div class="collapsible-header" onclick="toggleCollapse('lecture')">
+      <h2>📖 Lecture Notes — Miller-Rabin Primality Testing</h2>
+      <span class="collapsible-arrow" id="arrow-lecture">▼</span>
+    </div>
+    <div class="collapsible-body" id="body-lecture" style="max-height:0;overflow:hidden">
+      <div style="padding-top:12px">
+
+        <div class="lecture-h3">1. Why Primality Testing Matters</div>
+        <p class="section-text">RSA encryption requires two large random primes p and q (1024–4096 bits each). Naïve trial division up to √n is completely infeasible — √(2²⁰⁴⁸) ≈ 2¹⁰²⁴, more atoms than the observable universe. Miller-Rabin tests in O(k · log²n) time with error ≤ 4⁻ᵏ.</p>
+
+        <div class="lecture-h3">2. Fermat's Little Theorem &amp; Its Limits</div>
+        <p class="section-text">If p is prime: a^(p−1) ≡ 1 (mod p) for all a not divisible by p. The Fermat test checks this — but Carmichael numbers fool it completely. Miller-Rabin fixes this by additionally checking the squaring chain.</p>
+
+        <div class="lecture-h3">3. Decomposing n−1 = 2ˢ · d</div>
+        <div class="lecture-code">DECOMPOSE(n):
+  d = n - 1; s = 0
+  while d is even:
+    d = d / 2; s = s + 1
+  return (s, d)
+// n−1 = 2^s * d, where d is odd</div>
+
+        <div class="lecture-h3">4. The Squaring Chain</div>
+        <div class="lecture-code">MILLER-RABIN-WITNESS(n, a, s, d):
+  x = modpow(a, d, n)         // square-and-multiply
+  if x == 1 or x == n-1: return PROBABLY_PRIME
+  for r = 1 to s-1:
+    x = x*x mod n              // square
+    if x == n-1: return PROBABLY_PRIME
+  return COMPOSITE              // hit 1 without −1</div>
+        <p class="section-text" style="margin-top:6px">Three cases: (1) a^d ≡ 1 → passes immediately. (2) Some a^(2ʳd) ≡ −1 → passes. (3) Chain reaches 1 without −1 → non-trivial √1 found → COMPOSITE.</p>
+
+        <div class="lecture-h3">5. Multiple Rounds &amp; Confidence</div>
+        <table class="lecture-table">
+          <tr><th>Rounds k</th><th>Max Error</th><th>Use Case</th></tr>
+          <tr><td>5</td><td>4⁻⁵ ≈ 0.1%</td><td>Quick check</td></tr>
+          <tr><td>20</td><td>4⁻²⁰ ≈ 10⁻¹²</td><td>Standard</td></tr>
+          <tr><td>40</td><td>4⁻⁴⁰ ≈ 10⁻²⁴</td><td>High-security RSA</td></tr>
+        </table>
+
+        <div class="lecture-h3">6. Square-and-Multiply: O(log d)</div>
+        <div class="lecture-code">MODPOW(base, exp, mod):
+  result = 1; base = base mod mod
+  while exp > 0:
+    if exp is odd:
+      result = result * base mod mod   // multiply
+    exp = exp >> 1                     // halve exponent
+    base = base * base mod mod         // square
+  return result</div>
+        <p class="section-text">Each iteration halves the exponent. Total iterations = ⌊log₂ d⌋ + 1. For d = 2048-bit number: ~2048 iterations vs 2^2048 naive multiplications.</p>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- end right -->
+</div><!-- end main -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const SPEEDS = [0.25,0.5,1.0,1.5,2.0,4.0];
+const BASE_DELAY = 750;
+let speedIdx = 2;
+let steps = [];
+let currentStep = -1;
+let playInterval = null;
+let isPlaying = false;
+let rsaState = {};
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// PSEUDOCODE
+const PSEUDO = [
+  {code:"MILLER-RABIN(n, k):", tip:"Entry point: test n with k witness rounds"},
+  {code:"  write n−1 = 2^s · d (d odd)", tip:"Decompose: factor out all 2s from n−1. s = number of 2s, d = odd remainder"},
+  {code:"  for round = 1 to k:", tip:"Repeat with k different witnesses. Error probability ≤ 4^(-k)"},
+  {code:"    a = random witness in [2, n−2]", tip:"Pick a random base. Deterministic witnesses {2,3,5,7} suffice for n < 3.2 billion"},
+  {code:"    x = modpow(a, d, n)", tip:"Compute a^d mod n using square-and-multiply in O(log d) multiplications"},
+  {code:"    if x==1 or x==n−1: continue", tip:"x=1: Fermat-consistent immediately. x=n−1: found -1, chain is valid. Both pass."},
+  {code:"    for r = 1 to s−1:", tip:"Try squaring up to s−1 times, looking for x≡−1 (mod n)"},
+  {code:"      x = x*x mod n", tip:"Square x. We are computing a^(2^r * d) mod n"},
+  {code:"      if x == n−1: break", tip:"Found −1 in the chain. This round passes — consistent with n being prime"},
+  {code:"    else: return COMPOSITE", tip:"Exited loop without seeing −1. Non-trivial √1 found → n is definitely composite"},
+  {code:"  return PROBABLY PRIME", tip:"All k rounds passed. Probability of being wrong ≤ 4^(-k)"},
+];
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+  buildPseudo();
+  document.getElementById('inputN').addEventListener('input', validateN);
+  validateN();
+}
+
+function buildPseudo() {
+  document.getElementById('pseudoBlock').innerHTML = PSEUDO.map((p,i) =>
+    `<div class="pseudo-line" id="pl${i}">
+      <span class="pseudo-num">${String(i+1).padStart(2)}</span>
+      <span class="pseudo-code">${esc(p.code)}</span>
+      <span class="tooltip">${p.tip}</span>
+    </div>`
+  ).join('');
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function validateN() {
+  const el = document.getElementById('inputN');
+  const n = parseInt(el.value);
+  const hint = document.getElementById('hintN');
+  if (isNaN(n) || n < 3 || n % 2 === 0) {
+    el.className='invalid'; hint.textContent='Must be an odd integer ≥ 3'; hint.style.color='var(--red)'; return;
+  }
+  el.className='valid';
+  // Quick check
+  const factors = quickFactor(n);
+  if (factors.length === 1) { hint.textContent = n+' (likely prime)'; hint.style.color='var(--green)'; }
+  else { hint.textContent = n+' = '+factors.join(' × ')+' (composite)'; hint.style.color='var(--orange)'; }
+}
+
+function quickFactor(n) {
+  if (n < 2) return [n];
+  const factors = [];
+  let d = 2;
+  while (d * d <= n && d < 1000) { while (n % d === 0) { factors.push(d); n = n/d; } d++; }
+  if (n > 1) factors.push(n);
+  return factors;
+}
+
+function loadPreset(n) {
+  document.getElementById('inputN').value = n;
+  validateN(); resetAll();
+}
+
+function updateSpeed() {
+  speedIdx = parseInt(document.getElementById('speedSlider').value);
+  document.getElementById('speedLabel').textContent = SPEEDS[speedIdx].toFixed(2).replace('.00','')+'×';
+}
+
+// ═══════════════════════════════════════════════════════
+// MATH HELPERS
+// ═══════════════════════════════════════════════════════
+function modpow(base, exp, mod) {
+  let result = 1n;
+  base = BigInt(base) % BigInt(mod);
+  exp = BigInt(exp);
+  mod = BigInt(mod);
+  while (exp > 0n) {
+    if (exp % 2n === 1n) result = result * base % mod;
+    exp >>= 1n;
+    base = base * base % mod;
+  }
+  return Number(result);
+}
+
+function modpowSteps(base, exp, mod) {
+  // Returns array of {bit, action, base, result, expLeft}
+  const rows = [];
+  let r = 1n, b = BigInt(base) % BigInt(mod), e = BigInt(exp), m = BigInt(mod);
+  while (e > 0n) {
+    const bit = e % 2n === 1n ? 1 : 0;
+    const action = bit ? 'Square + Multiply' : 'Square';
+    rows.push({ bit, action, base: Number(b), result: Number(r), exp: Number(e) });
+    if (e % 2n === 1n) r = r * b % m;
+    e >>= 1n;
+    b = b * b % m;
+  }
+  return rows;
+}
+
+function decompose(n) {
+  let d = n - 1, s = 0;
+  while (d % 2 === 0) { d >>= 1; s++; }
+  return { s, d };
+}
+
+function fermatTest(n, a) {
+  return modpow(a, n-1, n) === 1;
+}
+
+// ═══════════════════════════════════════════════════════
+// BUILD STEPS
+// ═══════════════════════════════════════════════════════
+function buildSteps() {
+  const n = parseInt(document.getElementById('inputN').value);
+  const k = parseInt(document.getElementById('inputK').value) || 3;
+  if (isNaN(n) || n < 3 || n % 2 === 0) { alert('Please enter a valid odd integer ≥ 3.'); return; }
+
+  steps = [];
+  const { s, d } = decompose(n);
+
+  // Deterministic small witnesses, then random
+  const baseWitnesses = [2, 3, 5, 7, 11, 13, 17, 23];
+  const witnesses = [];
+  for (let i = 0; i < k; i++) {
+    const w = baseWitnesses[i] || (2 + Math.floor(Math.random() * (n - 4)));
+    if (w < n - 1) witnesses.push(w);
+    else witnesses.push(2);
+  }
+
+  // Step 0: decompose
+  steps.push({ type:'decompose', line:1, phase:'decomp', s, d, n,
+    explain:`Decompose n−1 = ${n-1}. Divide by 2 repeatedly: ${n-1} → ${(n-1)/2|0}… until odd. Result: s = ${s} (powers of 2), d = ${d} (odd part). So ${n-1} = 2^${s} × ${d}.`,
+    modpowRows:[], chainNodes:[], roundResults:[], modMultCount:0, squareCount:0, roundNum:0 });
+
+  let totalModMult = 0, totalSquare = 0;
+
+  witnesses.forEach((a, roundIdx) => {
+    // modpow steps
+    const mpRows = modpowSteps(a, d, n);
+    totalModMult += mpRows.length;
+
+    // Step: start round
+    steps.push({ type:'round_start', line:2, phase:'modpow', s, d, n, a, roundNum:roundIdx+1,
+      explain:`Round ${roundIdx+1}/${k}: witness a = ${a}. Now compute a^d = ${a}^${d} mod ${n} using square-and-multiply.`,
+      modpowRows:mpRows.slice(0), chainNodes:[], roundResults:[...witnesses.slice(0,roundIdx).map((_,i)=>({a:witnesses[i],result:'prime'}))],
+      modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
+
+    // modpow bit steps
+    mpRows.forEach((row, bi) => {
+      steps.push({ type:'modpow_step', line:4, phase:'modpow', s, d, n, a, roundNum:roundIdx+1,
+        explain:`Square-and-Multiply bit ${bi+1}/${mpRows.length}: bit=${row.bit}, action="${row.action}". base=${row.base}, exp=${row.exp}, running result=${row.result}.`,
+        modpowRows:mpRows.slice(0), activeModpowRow:bi, chainNodes:[], roundResults:[],
+        modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
+    });
+
+    // compute actual a^d mod n
+    let x = modpow(a, d, n);
+    const chain = [{ exp:`a^d`, val:x, state: x===1?'pass': x===n-1?'minus1':'active' }];
+
+    // Step: first check
+    steps.push({ type:'chain_start', line:5, phase:'chain', s, d, n, a, roundNum:roundIdx+1,
+      explain:`a^d = ${a}^${d} mod ${n} = ${x}. ${x===1?'Result is 1 — passes immediately (consistent with primality)': x===n-1?`Result is n−1 = ${n-1} ≡ −1 — found −1, chain is valid, passes`:  'Not 1 or n−1. Must check squaring chain.'}`,
+      modpowRows:mpRows, chainNodes:[...chain], roundResults:[], modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
+
+    let compositeFound = false;
+    if (x === 1 || x === n-1) {
+      chain[0].state = x===1?'pass':'minus1';
+    } else {
+      for (let r = 1; r < s; r++) {
+        const prev = x;
+        x = Number(BigInt(x)*BigInt(x) % BigInt(n));
+        totalSquare++;
+        let nodeState = 'active';
+        if (x === n-1) nodeState = 'minus1';
+        else if (x === 1) { nodeState = 'fail'; compositeFound = true; }
+        chain.push({ exp:`a^(2^${r}d)`, val:x, state:nodeState });
+
+        steps.push({ type:'chain_square', line:7, phase:'chain', s, d, n, a, roundNum:roundIdx+1, r,
+          explain:`Squaring step r=${r}/${s-1}: (${prev})² mod ${n} = ${x}. ${x===n-1?'Found −1 (≡ n−1). Chain is valid — this round passes.': x===1?`Hit 1 without seeing −1 first! ${prev} is a non-trivial square root of 1 mod ${n}. This is impossible in prime fields → ${n} is COMPOSITE.`: 'Not −1, continue squaring.'}`,
+          modpowRows:mpRows, chainNodes:[...chain], roundResults:[], modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
+
+        if (x === n-1 || compositeFound) break;
+      }
+    }
+
+    const roundResult = compositeFound ? 'composite' : 'prime';
+
+    steps.push({ type:'round_end', line: compositeFound?9:10, phase: compositeFound?'result_comp':'result_prime', s, d, n, a, roundNum:roundIdx+1,
+      explain: compositeFound ? `Round ${roundIdx+1} CONCLUDES: ${n} is COMPOSITE (witness a=${a} detected non-trivial √1).` :
+        `Round ${roundIdx+1} PASSES: witness a=${a} is consistent with ${n} being prime. ${roundIdx+1} round(s) complete — error probability ≤ 4^-${roundIdx+1} = ${Math.pow(4,-(roundIdx+1)).toExponential(2)}.`,
+      modpowRows:mpRows, chainNodes:[...chain], roundResults: witnesses.slice(0,roundIdx+1).map((w,i)=>({a:w, result: i<roundIdx?'prime': roundResult})),
+      modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1,
+      isComposite: compositeFound, finalRound: compositeFound });
+
+    if (compositeFound) return; // stop early
+  });
+
+  // Final verdict
+  const lastStep = steps[steps.length-1];
+  const isComposite = lastStep.isComposite;
+  const fermats = witnesses.map(a => ({ a, pass: fermatTest(n,a) }));
+  steps.push({ type:'verdict', line:10, phase: isComposite?'result_comp':'result_prime', s, d, n,
+    explain: isComposite ? `VERDICT: ${n} is COMPOSITE. Miller-Rabin detected a non-trivial square root of 1.` :
+      `VERDICT: ${n} is PROBABLY PRIME after ${witnesses.length} rounds. Probability of error ≤ 4^-${witnesses.length} = ${Math.pow(4,-witnesses.length).toExponential(2)}.`,
+    modpowRows:lastStep.modpowRows, chainNodes:lastStep.chainNodes,
+    roundResults: witnesses.map((w,i)=>({a:w, result:isComposite && i===lastStep.roundNum-1?'composite':'prime'})),
+    modMultCount:totalModMult, squareCount:totalSquare, roundNum:lastStep.roundNum,
+    isComposite, fermatResults: fermats });
+
+  // UI
+  currentStep = -1;
+  document.getElementById('stepCurrent').textContent = '0';
+  document.getElementById('stepTotal').textContent = steps.length;
+  document.getElementById('historyBody').innerHTML = '';
+  document.getElementById('resultBox').style.display = 'none';
+  setStatus('ready');
+  setButtons({build:true,step:true,play:true,pause:false,reset:true});
+}
+
+// ═══════════════════════════════════════════════════════
+// APPLY STEP
+// ═══════════════════════════════════════════════════════
+function applyStep(i) {
+  if (i < 0 || i >= steps.length) return;
+  const s = steps[i];
+
+  // Counters
+  document.getElementById('cntRound').textContent = s.roundNum || 0;
+  document.getElementById('cntModMult').textContent = s.modMultCount || 0;
+  document.getElementById('cntSquare').textContent = s.squareCount || 0;
+  document.getElementById('stepCurrent').textContent = i+1;
+
+  // Confidence
+  const k = s.roundNum || 0;
+  const confPct = k > 0 ? Math.min(99.9, (1 - Math.pow(4,-k))*100) : 0;
+  document.getElementById('cntConf').textContent = k > 0 ? (confPct.toFixed(1)+'%') : 'Untested';
+  document.getElementById('confBar').style.width = confPct+'%';
+  document.getElementById('confBar').style.background = s.isComposite ? 'var(--red)' : 'var(--green)';
+
+  // Pseudocode
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  const pl = document.getElementById('pl'+s.line);
+  if (pl) { pl.classList.add('active'); pl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+
+  // Phase badge
+  const phaseName = {decomp:'Decompose n−1',modpow:'Square-and-Multiply',chain:'Squaring Chain',result_prime:'Probably Prime',result_comp:'COMPOSITE',}[s.phase]||s.phase;
+  const phClass = {decomp:'ph-decomp',modpow:'ph-modpow',chain:'ph-chain',result_prime:'ph-result-prime',result_comp:'ph-result-comp'}[s.phase]||'ph-decomp';
+  document.getElementById('stepExplain').innerHTML = `<span class="phase-badge ${phClass}">${phaseName}</span><br>${s.explain}`;
+  triggerMotion(document.getElementById('stepExplain'), 'motion-pulse');
+
+  // Decompose display
+  renderDecompose(s);
+
+  // Modpow table
+  renderModpow(s);
+
+  // Chain
+  renderChain(s);
+
+  // Rounds
+  renderRounds(s);
+
+  // Result / Fermat
+  if (s.type === 'verdict') {
+    renderVerdict(s);
+    setStatus('done');
+    setButtons({build:true,step:false,play:false,pause:false,reset:true});
+  }
+
+  // History
+  addHistory(i, s);
+}
+
+function renderDecompose(s) {
+  const el = document.getElementById('decompDisplay');
+  const bits = document.getElementById('decompBits');
+  const res = document.getElementById('decompResult');
+  el.innerHTML = `n−1 = <strong style="color:var(--text)">${s.n-1}</strong> = 2<sup>${s.s}</sup> × <strong style="color:var(--green)">${s.d}</strong>`;
+  el.style.color = 'var(--text2)';
+  // Show binary decomposition bits
+  const binaryD = (s.d).toString(2);
+  bits.innerHTML = Array.from({length:s.s},(_,i)=>`<div class="decomp-bit two">2</div>`).join('') +
+    `<span style="color:var(--text3);margin:0 6px;font-size:18px">×</span>` +
+    Array.from(binaryD).map(b=>`<div class="decomp-bit odd">${b}</div>`).join('');
+  res.textContent = `s = ${s.s} (powers of 2)   |   d = ${s.d} (odd, binary: ${binaryD})`;
+}
+
+function renderModpow(s) {
+  const tbody = document.getElementById('modpowBody');
+  if (!s.modpowRows || !s.modpowRows.length) { tbody.innerHTML = ''; return; }
+  tbody.innerHTML = s.modpowRows.map((row, bi) => {
+    const active = s.activeModpowRow === bi ? 'active-row' : '';
+    const done = (s.activeModpowRow === undefined || bi < s.activeModpowRow) ? 'opacity:0.5' : '';
+    return `<tr class="${active}" style="${done}">
+      <td>${row.bit}</td><td>${row.action}</td><td>${row.base}</td><td>${row.result}</td><td>${row.exp}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('modpowCaption').innerHTML = `Witness <strong style="color:var(--teal)">a = ${s.a||'—'}</strong>, exponent <strong>d = ${s.d}</strong>, modulus <strong>n = ${s.n}</strong>. Binary of d: <code style="color:var(--yellow)">${(s.d).toString(2)}</code>`;
+}
+
+function renderChain(s) {
+  const wrap = document.getElementById('chainWrap');
+  if (!s.chainNodes || !s.chainNodes.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text3)">Run steps to see squaring chain.</span>'; return; }
+  wrap.innerHTML = s.chainNodes.map((node, ni) => {
+    const stateClass = {active:'cn-active',pass:'cn-pass',minus1:'cn-minus1',fail:'cn-fail'}[node.state]||'cn-idle';
+    return `<div class="chain-node ${stateClass}">
+      <div class="cn-exp">${node.exp}</div>
+      <div class="cn-val">${node.val}</div>
+      ${node.val === s.n-1 ? `<div style="font-size:9px;color:var(--teal)">≡ −1 ✓</div>` : ''}
+      ${node.val === 1 && node.state==='pass' ? `<div style="font-size:9px;color:var(--green)">≡ 1 ✓</div>` : ''}
+      ${node.state==='fail' ? `<div style="font-size:9px;color:var(--red)">COMPOSITE</div>` : ''}
+    </div>${ni < s.chainNodes.length-1 ? '<span class="chain-arrow">→</span>' : ''}`;
+  }).join('');
+}
+
+function renderRounds(s) {
+  const wrap = document.getElementById('roundsWrap');
+  if (!s.roundResults || !s.roundResults.length) return;
+  wrap.innerHTML = s.roundResults.map((r,i) => {
+    const cls = r.result==='composite'?'composite':r.result==='prime'?'prime':'testing';
+    return `<span class="round-badge ${cls}">Round ${i+1}: a=${r.a} — ${r.result==='composite'?'COMPOSITE':r.result==='prime'?'Passes':'Testing…'}</span>`;
+  }).join('');
+}
+
+function renderVerdict(s) {
+  const box = document.getElementById('resultBox');
+  box.style.display = 'block';
+  const cls = s.isComposite ? 'result-box-comp' : 'result-box-prime';
+  const icon = s.isComposite ? '✗' : '✓';
+  const color = s.isComposite ? 'var(--red)' : 'var(--green)';
+  box.className = cls;
+  box.innerHTML = `<div style="font-size:15px;font-weight:700;color:${color};margin-bottom:6px">${icon} ${s.n} is ${s.isComposite?'COMPOSITE':'PROBABLY PRIME'}</div>
+    <div style="font-size:12px;color:var(--text2)">${s.isComposite?`Detected by witness a=${s.chainNodes&&s.chainNodes.length?'—':''}: non-trivial square root of 1 found in squaring chain.`:`Passed all ${s.roundNum} witness rounds. Error probability ≤ 4⁻${s.roundNum} ≈ ${Math.pow(4,-s.roundNum).toExponential(2)}.`}</div>`;
+
+  // Fermat compare
+  if (s.fermatResults) {
+    const allFermatPass = s.fermatResults.every(f=>f.pass);
+    document.getElementById('fermatResult').innerHTML = s.fermatResults.map(f=>`a=${f.a}: ${f.pass?'<span style="color:var(--orange)">1 (looks prime)</span>':'<span style="color:var(--red)">≠1 (composite)</span>'}`).join('<br>');
+    document.getElementById('mrResult').innerHTML = `${s.isComposite?'<span style="color:var(--red)">COMPOSITE</span>':'<span style="color:var(--green)">PROBABLY PRIME</span>'}${allFermatPass && s.isComposite ? '<br><span style="color:var(--orange);font-size:11px">Fermat failed to detect — Miller-Rabin succeeded ✓</span>':''}`;
+  }
+}
+
+function addHistory(i, s) {
+  const tbody = document.getElementById('historyBody');
+  const tr = document.createElement('tr');
+  tr.dataset.step = i;
+  const phMap = {decomp:'Decompose',modpow:'ModPow',chain:'Chain',result_prime:'Prime',result_comp:'Composite',verdict:'Verdict'};
+  tr.innerHTML = `<td>${i+1}</td><td>${phMap[s.phase]||s.phase}</td><td>${s.type.replace(/_/g,' ')}</td><td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.explain.substring(0,40)}…</td>`;
+  tr.addEventListener('click', ()=>jumpToStep(parseInt(tr.dataset.step)));
+  tbody.insertBefore(tr, tbody.firstChild);
+  while (tbody.rows.length > 30) tbody.deleteRow(tbody.rows.length-1);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.remove('current-row'));
+  tr.classList.add('current-row');
+  triggerMotion(tr, 'motion-flash');
+}
+
+function jumpToStep(i) {
+  if (i < 0 || i >= steps.length) return;
+  pausePlay();
+  currentStep = i;
+  applyStep(i);
+  document.querySelectorAll('#historyBody tr').forEach(r=>r.classList.toggle('current-row', parseInt(r.dataset.step)===i));
+}
+
+function stepForward() {
+  if (currentStep < steps.length-1) {
+    currentStep++;
+    applyStep(currentStep);
+    if (currentStep === steps.length-1) { setStatus('done'); setButtons({build:true,step:false,play:false,pause:false,reset:true}); }
+  }
+}
+
+function startPlay() {
+  if (isPlaying || currentStep >= steps.length-1) return;
+  isPlaying = true; setStatus('playing');
+  setButtons({build:false,step:false,play:false,pause:true,reset:false});
+  playInterval = setInterval(()=>{
+    if (currentStep < steps.length-1) { currentStep++; applyStep(currentStep); }
+    else { pausePlay(); setStatus('done'); setButtons({build:true,step:false,play:false,pause:false,reset:true}); }
+  }, BASE_DELAY/SPEEDS[speedIdx]);
+}
+
+function pausePlay() {
+  isPlaying = false;
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  if (steps.length && currentStep >= 0 && currentStep < steps.length-1) {
+    setStatus('paused'); setButtons({build:true,step:true,play:true,pause:false,reset:true});
+  }
+}
+
+function resetAll() {
+  pausePlay(); steps = []; currentStep = -1;
+  ['stepCurrent','stepTotal','cntRound','cntModMult','cntSquare'].forEach(id=>document.getElementById(id).textContent='0');
+  document.getElementById('cntConf').textContent='Untested';
+  document.getElementById('confBar').style.width='0%';
+  document.getElementById('stepExplain').innerHTML='<span style="color:var(--text3)">🎓 Click <strong>Build Steps</strong> to begin.</span>';
+  document.getElementById('historyBody').innerHTML='';
+  document.getElementById('resultBox').style.display='none';
+  document.getElementById('chainWrap').innerHTML='<span style="font-size:12px;color:var(--text3)">Run steps to see squaring chain.</span>';
+  document.getElementById('roundsWrap').innerHTML='<span style="font-size:12px;color:var(--text3)">Run Build Steps to see witness results.</span>';
+  document.getElementById('modpowBody').innerHTML='';
+  document.getElementById('decompBits').innerHTML='';
+  document.getElementById('decompDisplay').textContent='Build steps to see decomposition.';
+  document.getElementById('decompDisplay').style.color='var(--text3)';
+  document.getElementById('decompResult').textContent='';
+  document.getElementById('fermatResult').textContent='—';
+  document.getElementById('mrResult').textContent='—';
+  document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
+  setStatus('idle'); setButtons({build:true,step:false,play:false,pause:false,reset:false});
+}
+
+// ═══════════════════════════════════════════════════════
+// RSA DEMO
+// ═══════════════════════════════════════════════════════
+function isProbablyPrime(n, k=10) {
+  if (n < 2) return false; if (n === 2 || n === 3) return true; if (n % 2 === 0) return false;
+  let {s, d} = decompose(n);
+  const witnesses = [2,3,5,7,11,13,17,23,29,31].slice(0,k);
+  for (const a of witnesses) {
+    if (a >= n) continue;
+    let x = modpow(a, d, n);
+    if (x === 1 || x === n-1) continue;
+    let composite = true;
+    for (let r=1;r<s;r++) { x = Number(BigInt(x)*BigInt(x) % BigInt(n)); if (x===n-1){composite=false;break;} }
+    if (composite) return false;
+  }
+  return true;
+}
+
+function randPrime(bits) {
+  const min = Math.pow(2, bits-1), max = Math.pow(2, bits)-1;
+  let n = min + Math.floor(Math.random()*(max-min));
+  if (n % 2 === 0) n++;
+  while (!isProbablyPrime(n)) { n += 2; if (n > max) n = min+1; if(n%2===0)n++; }
+  return n;
+}
+
+function rsaGenKeys() {
+  const bits = Math.floor(parseInt(document.getElementById('rsaBits').value)/2);
+  const e = parseInt(document.getElementById('rsaE').value);
+  const log = document.getElementById('rsaLog');
+  log.innerHTML = '<div style="color:var(--teal);font-size:12px">Generating primes via Miller-Rabin…</div>';
+  setTimeout(()=>{
+    const p = randPrime(bits); const q = randPrime(bits);
+    const n = p*q; const phi = (p-1)*(q-1);
+    const g = gcd(e, phi);
+    if (g !== 1) { log.innerHTML = `<div style="color:var(--red)">gcd(e=${e}, φ(n)=${phi}) = ${g} ≠ 1. Choose different e.</div>`; return; }
+    const d = modInverse(e, phi);
+    rsaState = {p, q, n, phi, e, d};
+    renderRSA(`<div style="color:var(--green);font-weight:600;margin-bottom:8px">✓ Keys Generated</div>`);
+    document.getElementById('btnEncrypt').disabled = false;
+    document.getElementById('btnDecrypt').disabled = true;
+  }, 50);
+}
+
+function rsaEncrypt() {
+  if (!rsaState.n) return;
+  const m = parseInt(document.getElementById('rsaM').value);
+  if (m >= rsaState.n) { alert(`Message must be < n=${rsaState.n}`); return; }
+  rsaState.c = modpow(rsaState.e, m, rsaState.n);
+  // Correct order: c = m^e mod n
+  rsaState.c = Number(BigInt(m)**BigInt(rsaState.e) % BigInt(rsaState.n));
+  renderRSA(`<div style="color:var(--accent);font-weight:600;margin-bottom:8px">✓ Encrypted: c = m^e mod n = ${m}^${rsaState.e} mod ${rsaState.n} = ${rsaState.c}</div>`);
+  document.getElementById('btnDecrypt').disabled = false;
+}
+
+function rsaDecrypt() {
+  if (!rsaState.c) return;
+  const recovered = Number(BigInt(rsaState.c)**BigInt(rsaState.d) % BigInt(rsaState.n));
+  renderRSA(`<div style="color:var(--green);font-weight:600;margin-bottom:8px">✓ Decrypted: m = c^d mod n = ${rsaState.c}^${rsaState.d} mod ${rsaState.n} = ${recovered}</div>`);
+}
+
+function renderRSA(header) {
+  const s = rsaState;
+  document.getElementById('rsaLog').innerHTML = header + `
+    <div class="rsa-row"><span class="rsa-label">p (prime)</span><span class="rsa-val">${s.p||'—'}</span></div>
+    <div class="rsa-row"><span class="rsa-label">q (prime)</span><span class="rsa-val">${s.q||'—'}</span></div>
+    <div class="rsa-row"><span class="rsa-label">n = p×q</span><span class="rsa-val">${s.n||'—'}</span></div>
+    <div class="rsa-row"><span class="rsa-label">φ(n) = (p−1)(q−1)</span><span class="rsa-val">${s.phi||'—'}</span></div>
+    <div class="rsa-row"><span class="rsa-label">e (public)</span><span class="rsa-val">${s.e||'—'}</span></div>
+    <div class="rsa-row"><span class="rsa-label">d (private, e⁻¹ mod φ)</span><span class="rsa-val">${s.d||'—'}</span></div>
+    ${s.c!=null?`<div class="rsa-row"><span class="rsa-label">ciphertext c</span><span class="rsa-val">${s.c}</span></div>`:''}`;
+}
+
+function gcd(a,b){while(b){let t=b;b=a%b;a=t;}return a;}
+function modInverse(a,m){let [old_r,r]=[a,m],[old_s,s]=[1,0];while(r!==0){const q=Math.floor(old_r/r);[old_r,r]=[r,old_r-q*r];[old_s,s]=[s,old_s-q*s];}return((old_s%m)+m)%m;}
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function setStatus(s){const el=document.getElementById('statusBadge');el.className='status-badge status-'+s;el.textContent=s.charAt(0).toUpperCase()+s.slice(1);triggerMotion(el,'motion-pulse');}
+function setButtons(c){document.getElementById('btnBuild').disabled=!c.build;document.getElementById('btnStep').disabled=!c.step;document.getElementById('btnPlay').disabled=!c.play;document.getElementById('btnPause').disabled=!c.pause;document.getElementById('btnReset').disabled=!c.reset;}
+function toggleCollapse(id){const body=document.getElementById('body-'+id);const arrow=document.getElementById('arrow-'+id);const isOpen=body.style.maxHeight!=='0px'&&body.style.maxHeight!=='';if(isOpen){body.style.maxHeight='0';body.style.overflow='hidden';arrow.classList.remove('open');}else{body.style.maxHeight=body.scrollHeight+3000+'px';body.style.overflow='visible';arrow.classList.add('open');}}
+
+function triggerMotion(el, cls){
+  if(!el || reduceMotion) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+  el.addEventListener('animationend', ()=>el.classList.remove(cls), {once:true});
+}
+
+init();
+setButtons({build:true,step:false,play:false,pause:false,reset:false});
+</script>
+</body>
+</html>
