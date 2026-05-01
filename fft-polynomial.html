@@ -809,7 +809,10 @@ function applyStep(i) {
   // Pseudocode highlight
   document.querySelectorAll('.pseudo-line').forEach(el => el.classList.remove('active'));
   const pl = document.getElementById('pl'+s.line);
-  if (pl) { pl.classList.add('active'); pl.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+  if (pl) {
+    pl.classList.add('active');
+    if (!isPlaying) pl.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
 
   // Step explanation
   const phaseClass = s.phase==='fft'?'phase-fft':s.phase==='mult'?'phase-mult':'phase-ifft';
