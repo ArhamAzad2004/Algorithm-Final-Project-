@@ -818,7 +818,10 @@ function applyStep(i){
   // Pseudo highlight
   document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
   const pl=document.getElementById('pl'+s.line);
-  if(pl){pl.classList.add('active');pl.scrollIntoView({block:'nearest',behavior:'smooth'});}
+  if (pl) {
+    pl.classList.add('active');
+    if (!isPlaying) pl.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
 
   // Phase badge
   const phMap={init:'Setup',mst:'Phase 1 — Build MST',dfs:'Phase 2 — DFS Walk',tour:'Phase 3 — Shortcut Tour'};

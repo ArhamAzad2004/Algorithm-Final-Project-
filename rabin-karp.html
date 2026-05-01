@@ -701,7 +701,10 @@ function applyStep(i) {
   // Pseudocode
   document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
   const pl = document.getElementById('pl'+s.line);
-  if (pl) { pl.classList.add('active'); pl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  if (pl) {
+    pl.classList.add('active');
+    if (!isPlaying) pl.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
 
   // Phase badge
   const phMap = {init:'Initialise Hashes', slide:'Slide Window', match:'Real Match ✓', spurious:'Spurious Hit ⚠', hash_match:'Hash Check'};

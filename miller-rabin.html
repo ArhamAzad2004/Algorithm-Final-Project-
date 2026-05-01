@@ -778,7 +778,10 @@ function applyStep(i) {
   // Pseudocode
   document.querySelectorAll('.pseudo-line').forEach(el=>el.classList.remove('active'));
   const pl = document.getElementById('pl'+s.line);
-  if (pl) { pl.classList.add('active'); pl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+  if (pl) {
+    pl.classList.add('active');
+    if (!isPlaying) pl.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
 
   // Phase badge
   const phaseName = {decomp:'Decompose n−1',modpow:'Square-and-Multiply',chain:'Squaring Chain',result_prime:'Probably Prime',result_comp:'COMPOSITE',}[s.phase]||s.phase;
