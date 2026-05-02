@@ -11,12 +11,19 @@
   --accent:#3b82f6;--green:#22c55e;--orange:#f97316;--purple:#a855f7;
   --yellow:#eab308;--red:#ef4444;--teal:#14b8a6;--pink:#ec4899;
   --mst:#3b82f6;--dfs:#f97316;--tour:#22c55e;--city:#e2e8f0;
+  --nav-accent: var(--orange);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.6;}
 .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:10;}
 .header-title{font-size:18px;font-weight:700;}
 .header-sub{font-size:12px;color:var(--text2);}
+.header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.header-nav{display:flex;align-items:center;gap:4px;padding:3px;background:var(--bg3);border:1px solid var(--border);border-radius:999px;}
+.header-nav .nav-btn{background:transparent;border:1px solid transparent;color:var(--text2);padding:5px 11px;font-size:12px;border-radius:999px;line-height:1;}
+.header-nav .nav-btn:hover{color:var(--text);background:var(--bg4);border-color:var(--nav-accent);}
+.header-nav .nav-btn:focus-visible{outline:2px solid var(--nav-accent);outline-offset:1px;}
+.header-nav .nav-btn:disabled{opacity:.45;}
 .clo-badge{background:var(--orange);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
 .main{display:flex;height:calc(100vh - 56px);overflow:hidden;}
 .panel-left{width:420px;min-width:420px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
@@ -139,7 +146,14 @@ input[type=range]{flex:1;accent-color:var(--accent);}
     <div class="header-title">2-Approximation for Metric TSP</div>
     <div class="header-sub">BSD 404 — Algorithms II &nbsp;|&nbsp; Dr. Arash Kermani &nbsp;|&nbsp; Interactive Teaching Tool</div>
   </div>
-  <span class="clo-badge">CLO-5</span>
+  <div class="header-actions">
+    <div class="header-nav">
+      <button class="btn btn-secondary nav-btn" onclick="location.href='index.html'">Home</button>
+      <button class="btn btn-secondary nav-btn" onclick="location.href='rabin-karp.html'">Previous</button>
+      <button class="btn btn-secondary nav-btn" disabled>Next</button>
+    </div>
+    <span class="clo-badge">CLO-5</span>
+  </div>
 </div>
 
 <div class="main">
