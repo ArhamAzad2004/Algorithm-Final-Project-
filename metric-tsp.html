@@ -629,6 +629,44 @@ function dfsOrder(adj,root,n){
   return order;
 }
 
+function dfsWalk(adj,root,n){
+  const walk=[];
+  const visited=new Array(n).fill(false);
+  function dfs(u){
+    visited[u]=true; walk.push(u);
+    for(const v of adj[u]) {
+      if(!visited[v]) { dfs(v); walk.push(u); }
+    }
+  }
+  dfs(root);
+  return walk;
+}
+
+function optimalTourCost(cities){
+  const n=cities.length;
+  if(n>8) return null;
+  const nodes=[]; for(let i=1;i<n;i++) nodes.push(i);
+  let best=Infinity;
+  const used=new Array(nodes.length).fill(false);
+  const perm=[];
+  function backtrack(){
+    if(perm.length===nodes.length){
+      const tour=[0,...perm,0];
+      const cost=tourCost(tour,cities);
+      if(cost<best) best=cost;
+      return;
+    }
+    for(let i=0;i<nodes.length;i++){
+      if(used[i]) continue;
+      used[i]=true; perm.push(nodes[i]);
+      backtrack();
+      perm.pop(); used[i]=false;
+    }
+  }
+  backtrack();
+  return best;
+}
+
 function tourCost(tour,cities){
   let c=0;
   for(let i=0;i<tour.length-1;i++) c+=dist(cities[tour[i]],cities[tour[i+1]]);
@@ -645,10 +683,17 @@ function buildSteps(){
   const mstEdges=algo==='prim'?buildMSTPrim(cities):buildMSTKruskal(cities);
   const mstWeight=mstEdges.reduce((s,e)=>s+e.d,0);
   const adj=buildAdjList(n,mstEdges);
-  const dfsVisit=dfsOrder(adj,0,n);
-  const tourOrder=[...dfsVisit,0];
+  const dfsWalkPath=dfsWalk(adj,0,n);
+  const seenTourInit=new Set();
+  const tourCore=[];
+  for(const city of dfsWalkPath){
+    if(!seenTourInit.has(city)){seenTourInit.add(city);tourCore.push(city);}
+  }
+  const tourOrder=[...tourCore,0];
   const tCost=tourCost(tourOrder,cities);
   const dfsCost=mstWeight*2;
+  const optCost=optimalTourCost(cities);
+  const approxRatio=optCost? tCost/optCost : null;
 
   steps=[];
   let mstSoFar=[],dfsPathSoFar=[],tourSoFar=[],visitedSoFar=[];
@@ -656,7 +701,7 @@ function buildSteps(){
 
   // Step 0: init
   steps.push({type:'init',line:0,phase:'init',mstEdges:[],dfsPath:[],tourEdges:[],visitedCities:[],currentCity:-1,
-    mstCnt:0,dfsCnt:0,shortcutCnt:0,mstWeight:0,dfsCost,tCost,
+    mstCnt:0,dfsCnt:0,shortcutCnt:0,mstWeight:0,dfsCost,tCost,optCost,approxRatio,
     explain:`Setup: ${n} cities placed. We will build the MST using ${algo==='prim'?"Prim's":"Kruskal's"} algorithm, then do a DFS walk, then shortcut to get our approximate tour.`});
 
   // MST steps
@@ -666,59 +711,58 @@ function buildSteps(){
     const runW=mstSoFar.reduce((s,x)=>s+x.d,0);
     steps.push({type:'mst_edge',line:5,phase:'mst',
       mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[],visitedCities:[e.u,e.v],currentCity:e.v,
-      mstCnt,dfsCnt,shortcutCnt,mstWeight:runW,dfsCost,tCost,
+      mstCnt,dfsCnt,shortcutCnt,mstWeight:runW,dfsCost,tCost,optCost,approxRatio,
       explain:`MST edge ${i+1}/${mstEdges.length}: connect city ${e.u} → city ${e.v} (distance ${e.d.toFixed(1)}). Running MST weight = ${runW.toFixed(1)}. ${algo==='prim'?'Prim: chose minimum-cost crossing edge.':'Kruskal: chose minimum global edge that doesn\'t create a cycle.'}`});
   }
 
   // MST done
   steps.push({type:'mst_done',line:1,phase:'mst',
     mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[],visitedCities:Array.from({length:n},(_,i)=>i),currentCity:-1,
-    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,
+    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,optCost,approxRatio,
     explain:`MST complete! ${n-1} edges, total weight = ${mstWeight.toFixed(1)}. This is our lower bound: OPT tour ≥ MST = ${mstWeight.toFixed(1)}. DFS walk will cost 2×${mstWeight.toFixed(1)} = ${(2*mstWeight).toFixed(1)}.`});
 
   // DFS steps
-  for(let i=0;i<dfsVisit.length;i++){
-    const city=dfsVisit[i];
+  for(let i=0;i<dfsWalkPath.length;i++){
+    const city=dfsWalkPath[i];
     dfsPathSoFar=[...dfsPathSoFar,city]; dfsCnt++;
     steps.push({type:'dfs_visit',line:6,phase:'dfs',
       mstEdges:[...mstSoFar],dfsPath:[...dfsPathSoFar],tourEdges:[],visitedCities:[...dfsPathSoFar],currentCity:city,
-      mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,
-      explain:`DFS visit ${i+1}/${dfsVisit.length}: arrived at city ${city}. DFS walk traverses every MST edge twice — once going deep, once returning. Path so far: [${dfsPathSoFar.join(' → ')}].`});
+      mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost,tCost,optCost,approxRatio,
+      explain:`DFS walk step ${i+1}/${dfsWalkPath.length}: moved to city ${city}. DFS walk traverses every MST edge twice — once going deep, once returning. Walk so far: [${dfsPathSoFar.join(' → ')}].`});
   }
   steps.push({type:'dfs_done',line:7,phase:'dfs',
-    mstEdges:[...mstSoFar],dfsPath:[...dfsVisit,0],tourEdges:[],visitedCities:Array.from({length:n},(_,i)=>i),currentCity:0,
-    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
-    explain:`DFS walk complete. Full walk order: [${dfsVisit.join(' → ')} → 0 (back to start)]. Total walk cost ≈ 2×${mstWeight.toFixed(1)} = ${(2*mstWeight).toFixed(1)}. Now shortcut: keep only first visits.`});
+    mstEdges:[...mstSoFar],dfsPath:[...dfsWalkPath],tourEdges:[],visitedCities:Array.from({length:n},(_,i)=>i),currentCity:0,
+    mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,optCost,approxRatio,
+    explain:`DFS walk complete. Full walk order (with backtracking): [${dfsWalkPath.join(' → ')}]. Total walk cost ≈ 2×${mstWeight.toFixed(1)} = ${(2*mstWeight).toFixed(1)}. Now shortcut: keep only first visits.`});
 
   // Shortcut / tour steps
   const seen=new Set();
-  for(let i=0;i<dfsVisit.length;i++){
-    const city=dfsVisit[i];
+  for(let i=0;i<dfsWalkPath.length;i++){
+    const city=dfsWalkPath[i];
     if(!seen.has(city)){
       seen.add(city); tourSoFar=[...tourSoFar,city]; shortcutCnt++;
-      const prevIdx=tourSoFar.length>1?tourSoFar[tourSoFar.length-2]:-1;
       const tourEdgesNow=[];
       for(let j=0;j<tourSoFar.length-1;j++) tourEdgesNow.push({u:tourSoFar[j],v:tourSoFar[j+1]});
-      const runT=tourCost([...tourSoFar,tourSoFar[0]].slice(0,tourSoFar.length>1?tourSoFar.length:1),cities);
       steps.push({type:'shortcut',line:10,phase:'tour',
         mstEdges:[...mstSoFar],dfsPath:[],tourEdges:tourEdgesNow,visitedCities:[...tourSoFar],currentCity:city,
-        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
+        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,optCost,approxRatio,
         explain:`Tour step ${shortcutCnt}/${n}: city ${city} is first visit — add to tour. Tour so far: [${tourSoFar.join(' → ')}]. Triangle inequality ensures this direct path ≤ any DFS detour.`});
     } else {
+      const tourEdgesNow=[];
+      for(let j=0;j<tourSoFar.length-1;j++) tourEdgesNow.push({u:tourSoFar[j],v:tourSoFar[j+1]});
       steps.push({type:'skip',line:10,phase:'tour',
-        mstEdges:[...mstSoFar],dfsPath:[],tourEdges:[...steps[steps.length-1].tourEdges||[]],visitedCities:[...tourSoFar],currentCity:city,
-        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,
+        mstEdges:[...mstSoFar],dfsPath:[],tourEdges:tourEdgesNow,visitedCities:[...tourSoFar],currentCity:city,
+        mstCnt,dfsCnt,shortcutCnt,mstWeight,dfsCost:2*mstWeight,tCost,optCost,approxRatio,
         explain:`City ${city} already in tour — SKIP (shortcutting). This is where triangle inequality pays off: going directly to the next new city is ≤ cost of the detour back here.`});
     }
   }
 
   // Close tour
   const finalTourEdges=tourOrder.slice(0,tourOrder.length-1).map((_,i)=>({u:tourOrder[i],v:tourOrder[i+1]}));
-  const approxRatio=tCost/mstWeight;
   steps.push({type:'done',line:12,phase:'tour',
     mstEdges:[...mstSoFar],dfsPath:[],tourEdges:finalTourEdges,visitedCities:Array.from({length:n},(_,i)=>i),currentCity:0,
-    mstCnt,dfsCnt:n,shortcutCnt:n,mstWeight,dfsCost:2*mstWeight,tCost,approxRatio,
-    explain:`Tour complete! Return to start city 0. Approximate tour: [${tourOrder.join(' → ')}]. Tour cost = ${tCost.toFixed(1)}. 2×MST bound = ${(2*mstWeight).toFixed(1)}. Ratio = ${approxRatio.toFixed(3)}× (must be ≤ 2.0).`});
+    mstCnt,dfsCnt:dfsWalkPath.length,shortcutCnt:n,mstWeight,dfsCost:2*mstWeight,tCost,optCost,approxRatio,
+    explain:`Tour complete! Return to start city 0. Approximate tour: [${tourOrder.join(' → ')}]. Tour cost = ${tCost.toFixed(1)}. 2×MST bound = ${(2*mstWeight).toFixed(1)}.${optCost?` OPT = ${optCost.toFixed(1)} → ratio = ${(tCost/optCost).toFixed(3)}×.`:' OPT computed only for n ≤ 8.'}`});
 
   currentStep=-1;
   document.getElementById('stepCurrent').textContent='0';
@@ -869,7 +913,11 @@ function updateCostBars(s){
   setBar('DFS',s.phase!=='mst'&&s.phase!=='init'?s.dfsCost:0,maxVal);
   setBar('Tour',s.tourEdges&&s.tourEdges.length?s.tCost:0,maxVal);
   setBar('2MST',s.mstWeight?s.mstWeight*2:0,maxVal);
-  if(s.approxRatio) document.getElementById('approxRatio').textContent=s.approxRatio.toFixed(3)+'× OPT';
+  if(s.approxRatio){
+    document.getElementById('approxRatio').textContent=s.approxRatio.toFixed(3)+'× OPT';
+  } else {
+    document.getElementById('approxRatio').textContent='— (OPT only for n ≤ 8)';
+  }
 }
 
 function clearCostBars(){
@@ -884,13 +932,14 @@ function renderResult(s){
   const box=document.getElementById('resultBox');
   box.style.display='block';
   const pass=s.tCost<=s.mstWeight*2+0.01;
+  const ratioText=s.approxRatio?`${s.approxRatio.toFixed(3)}× OPT`:'— (OPT only for n ≤ 8)';
   box.innerHTML=`<div style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:10px">✓ Approximation Complete</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;margin-bottom:10px">
       <div style="text-align:center"><div style="color:var(--text3)">MST weight</div><div style="font-size:18px;font-weight:700;color:var(--mst)">${s.mstWeight.toFixed(1)}</div></div>
       <div style="text-align:center"><div style="color:var(--text3)">Tour cost</div><div style="font-size:18px;font-weight:700;color:var(--tour)">${s.tCost.toFixed(1)}</div></div>
       <div style="text-align:center"><div style="color:var(--text3)">2× bound</div><div style="font-size:18px;font-weight:700;color:var(--yellow)">${(s.mstWeight*2).toFixed(1)}</div></div>
     </div>
-    <div style="font-size:13px;color:var(--text2)">Approximation ratio: <strong style="color:var(--green)">${s.approxRatio.toFixed(3)}×</strong> &nbsp;|&nbsp; Tour ≤ 2×MST: <strong style="color:${pass?'var(--green)':'var(--red)'}">${pass?'✓ HOLDS':'✗ ERROR'}</strong></div>`;
+    <div style="font-size:13px;color:var(--text2)">Approximation ratio: <strong style="color:var(--green)">${ratioText}</strong> &nbsp;|&nbsp; Tour ≤ 2×MST: <strong style="color:${pass?'var(--green)':'var(--red)'}">${pass?'✓ HOLDS':'✗ ERROR'}</strong></div>`;
 }
 
 function addHistory(i,s){
