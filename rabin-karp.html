@@ -670,12 +670,14 @@ function buildSteps() {
     if (i < n - m) {
       const outChar = T.charCodeAt(i);
       const inChar = T.charCodeAt(i + m);
-      wHash = ((d * ((wHash - outChar * h % q) + q)) % q + inChar) % q;
+      const prevHash = wHash;
+      const removed = (prevHash - (outChar * h) % q + q) % q;
+      wHash = (d * removed + inChar) % q;
       steps.push({
         type:'roll', line:12, phase:'slide', pos:i, pHash, wHash, h, d, q, T, P, m,
         hashComps, charVerifs, spurious, matches,
         matchPositions:[...matchPositions], spuriousPositions:[...spuriousPositions],
-        explain:`Roll hash: remove T[${i}]="${T[i]}" (code ${outChar}), add T[${i+m}]="${T[i+m]}" (code ${inChar}). new_hash = (${d}×(${((d*((steps[steps.length-1].wHash)-outChar*h%q+q))%q)}}+${inChar}) mod ${q} = ${wHash}. Next window will be "${T.substring(i+1,i+m+1)}".`,
+        explain:`Roll hash: remove T[${i}]="${T[i]}" (code ${outChar}), add T[${i+m}]="${T[i+m]}" (code ${inChar}). new_hash = (${d}×(${removed}) + ${inChar}) mod ${q} = ${wHash} (from prev ${prevHash}). Next window will be "${T.substring(i+1,i+m+1)}".`,
         windowState:'normal', verifyResult:null
       });
     }

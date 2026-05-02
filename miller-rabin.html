@@ -585,18 +585,43 @@ function buildPseudo() {
 
 function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
+
+function parseBigIntInput(value) {
+  const trimmed = value.trim();
+  if (!/^[+-]?\d+$/.test(trimmed)) return null;
+  try { return BigInt(trimmed); } catch { return null; }
+}
+
+function formatVal(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'bigint') return v.toString();
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '—';
+  return String(v);
+}
+
+function formatMaybe(v) {
+  return v === undefined || v === null ? '—' : formatVal(v);
+}
+
 function validateN() {
   const el = document.getElementById('inputN');
-  const n = parseInt(el.value);
+  const n = parseBigIntInput(el.value);
   const hint = document.getElementById('hintN');
-  if (isNaN(n) || n < 3 || n % 2 === 0) {
+  if (n === null || n < 3n || n % 2n === 0n) {
     el.className='invalid'; hint.textContent='Must be an odd integer ≥ 3'; hint.style.color='var(--red)'; return;
   }
   el.className='valid';
   // Quick check
-  const factors = quickFactor(n);
-  if (factors.length === 1) { hint.textContent = n+' (likely prime)'; hint.style.color='var(--green)'; }
-  else { hint.textContent = n+' = '+factors.join(' × ')+' (composite)'; hint.style.color='var(--orange)'; }
+  if (n <= MAX_SAFE_BIGINT) {
+    const nNum = Number(n);
+    const factors = quickFactor(nNum);
+    if (factors.length === 1) { hint.textContent = nNum+' (likely prime)'; hint.style.color='var(--green)'; }
+    else { hint.textContent = nNum+' = '+factors.join(' × ')+' (composite)'; hint.style.color='var(--orange)'; }
+  } else {
+    hint.textContent = formatVal(n)+' (odd, large input)';
+    hint.style.color = 'var(--green)';
+  }
 }
 
 function quickFactor(n) {
@@ -623,15 +648,15 @@ function updateSpeed() {
 // ═══════════════════════════════════════════════════════
 function modpow(base, exp, mod) {
   let result = 1n;
-  base = BigInt(base) % BigInt(mod);
-  exp = BigInt(exp);
-  mod = BigInt(mod);
-  while (exp > 0n) {
-    if (exp % 2n === 1n) result = result * base % mod;
-    exp >>= 1n;
-    base = base * base % mod;
+  let b = BigInt(base) % BigInt(mod);
+  let e = BigInt(exp);
+  const m = BigInt(mod);
+  while (e > 0n) {
+    if (e % 2n === 1n) result = result * b % m;
+    e >>= 1n;
+    b = b * b % m;
   }
-  return Number(result);
+  return result;
 }
 
 function modpowSteps(base, exp, mod) {
@@ -641,7 +666,7 @@ function modpowSteps(base, exp, mod) {
   while (e > 0n) {
     const bit = e % 2n === 1n ? 1 : 0;
     const action = bit ? 'Square + Multiply' : 'Square';
-    rows.push({ bit, action, base: Number(b), result: Number(r), exp: Number(e) });
+    rows.push({ bit, action, base: b.toString(), result: r.toString(), exp: e.toString() });
     if (e % 2n === 1n) r = r * b % m;
     e >>= 1n;
     b = b * b % m;
@@ -650,50 +675,74 @@ function modpowSteps(base, exp, mod) {
 }
 
 function decompose(n) {
-  let d = n - 1, s = 0;
-  while (d % 2 === 0) { d >>= 1; s++; }
+  let d = BigInt(n) - 1n, s = 0;
+  while (d % 2n === 0n) { d >>= 1n; s++; }
   return { s, d };
 }
 
 function fermatTest(n, a) {
-  return modpow(a, n-1, n) === 1;
+  return modpow(a, BigInt(n) - 1n, n) === 1n;
+}
+
+function randomBigIntInRange(min, max) {
+  if (max < min) return min;
+  const range = max - min + 1n;
+  const bits = range.toString(2).length;
+  const bytes = Math.ceil(bits / 8);
+  let x = 0n;
+  do {
+    const buf = new Uint8Array(bytes);
+    crypto.getRandomValues(buf);
+    x = 0n;
+    for (const b of buf) x = (x << 8n) + BigInt(b);
+  } while (x >= range);
+  return min + x;
+}
+
+function pickWitness(n, idx, baseWitnesses) {
+  const nMinus2 = n - 2n;
+  if (nMinus2 <= 1n) return 2n;
+  if (idx < baseWitnesses.length && baseWitnesses[idx] <= nMinus2) return baseWitnesses[idx];
+  return randomBigIntInRange(2n, nMinus2);
 }
 
 // ═══════════════════════════════════════════════════════
 // BUILD STEPS
 // ═══════════════════════════════════════════════════════
 function buildSteps() {
-  const n = parseInt(document.getElementById('inputN').value);
+  const n = parseBigIntInput(document.getElementById('inputN').value);
   const k = parseInt(document.getElementById('inputK').value) || 3;
-  if (isNaN(n) || n < 3 || n % 2 === 0) { alert('Please enter a valid odd integer ≥ 3.'); return; }
+  if (n === null || n < 3n || n % 2n === 0n) { alert('Please enter a valid odd integer ≥ 3.'); return; }
 
   steps = [];
   const { s, d } = decompose(n);
+  const nMinus1 = n - 1n;
 
   // Deterministic small witnesses, then random
-  const baseWitnesses = [2, 3, 5, 7, 11, 13, 17, 23];
+  const baseWitnesses = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 23n];
   const witnesses = [];
   for (let i = 0; i < k; i++) {
-    const w = baseWitnesses[i] || (2 + Math.floor(Math.random() * (n - 4)));
-    if (w < n - 1) witnesses.push(w);
-    else witnesses.push(2);
+    witnesses.push(pickWitness(n, i, baseWitnesses));
   }
 
   // Step 0: decompose
   steps.push({ type:'decompose', line:1, phase:'decomp', s, d, n,
-    explain:`Decompose n−1 = ${n-1}. Divide by 2 repeatedly: ${n-1} → ${(n-1)/2|0}… until odd. Result: s = ${s} (powers of 2), d = ${d} (odd part). So ${n-1} = 2^${s} × ${d}.`,
+    explain:`Decompose n−1 = ${formatVal(nMinus1)}. Divide by 2 repeatedly: ${formatVal(nMinus1)} → ${formatVal(nMinus1/2n)} … until odd. Result: s = ${s} (powers of 2), d = ${formatVal(d)} (odd part). So ${formatVal(nMinus1)} = 2^${s} × ${formatVal(d)}.`,
     modpowRows:[], chainNodes:[], roundResults:[], modMultCount:0, squareCount:0, roundNum:0 });
 
   let totalModMult = 0, totalSquare = 0;
+  let compositeWitness = null;
+  let roundsCompleted = 0;
 
-  witnesses.forEach((a, roundIdx) => {
+  for (let roundIdx = 0; roundIdx < witnesses.length; roundIdx++) {
+    const a = witnesses[roundIdx];
     // modpow steps
     const mpRows = modpowSteps(a, d, n);
     totalModMult += mpRows.length;
 
     // Step: start round
     steps.push({ type:'round_start', line:2, phase:'modpow', s, d, n, a, roundNum:roundIdx+1,
-      explain:`Round ${roundIdx+1}/${k}: witness a = ${a}. Now compute a^d = ${a}^${d} mod ${n} using square-and-multiply.`,
+      explain:`Round ${roundIdx+1}/${k}: witness a = ${formatVal(a)}. Now compute a^d = ${formatVal(a)}^${formatVal(d)} mod ${formatVal(n)} using square-and-multiply.`,
       modpowRows:mpRows.slice(0), chainNodes:[], roundResults:[...witnesses.slice(0,roundIdx).map((_,i)=>({a:witnesses[i],result:'prime'}))],
       modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
 
@@ -707,57 +756,62 @@ function buildSteps() {
 
     // compute actual a^d mod n
     let x = modpow(a, d, n);
-    const chain = [{ exp:`a^d`, val:x, state: x===1?'pass': x===n-1?'minus1':'active' }];
+    const chain = [{ exp:`a^d`, val:x, state: x===1n?'pass': x===nMinus1?'minus1':'active' }];
 
     // Step: first check
     steps.push({ type:'chain_start', line:5, phase:'chain', s, d, n, a, roundNum:roundIdx+1,
-      explain:`a^d = ${a}^${d} mod ${n} = ${x}. ${x===1?'Result is 1 — passes immediately (consistent with primality)': x===n-1?`Result is n−1 = ${n-1} ≡ −1 — found −1, chain is valid, passes`:  'Not 1 or n−1. Must check squaring chain.'}`,
+      explain:`a^d = ${formatVal(a)}^${formatVal(d)} mod ${formatVal(n)} = ${formatVal(x)}. ${x===1n?'Result is 1 — passes immediately (consistent with primality)': x===nMinus1?`Result is n−1 = ${formatVal(nMinus1)} ≡ −1 — found −1, chain is valid, passes`:  'Not 1 or n−1. Must check squaring chain.'}`,
       modpowRows:mpRows, chainNodes:[...chain], roundResults:[], modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
 
     let compositeFound = false;
-    if (x === 1 || x === n-1) {
-      chain[0].state = x===1?'pass':'minus1';
+    let foundMinus1 = x === nMinus1;
+    if (x === 1n || x === nMinus1) {
+      chain[0].state = x===1n?'pass':'minus1';
     } else {
       for (let r = 1; r < s; r++) {
         const prev = x;
-        x = Number(BigInt(x)*BigInt(x) % BigInt(n));
+        x = (x * x) % n;
         totalSquare++;
         let nodeState = 'active';
-        if (x === n-1) nodeState = 'minus1';
-        else if (x === 1) { nodeState = 'fail'; compositeFound = true; }
+        if (x === nMinus1) { nodeState = 'minus1'; foundMinus1 = true; }
+        else if (x === 1n) { nodeState = 'fail'; compositeFound = true; }
         chain.push({ exp:`a^(2^${r}d)`, val:x, state:nodeState });
 
         steps.push({ type:'chain_square', line:7, phase:'chain', s, d, n, a, roundNum:roundIdx+1, r,
-          explain:`Squaring step r=${r}/${s-1}: (${prev})² mod ${n} = ${x}. ${x===n-1?'Found −1 (≡ n−1). Chain is valid — this round passes.': x===1?`Hit 1 without seeing −1 first! ${prev} is a non-trivial square root of 1 mod ${n}. This is impossible in prime fields → ${n} is COMPOSITE.`: 'Not −1, continue squaring.'}`,
+          explain:`Squaring step r=${r}/${s-1}: (${formatVal(prev)})² mod ${formatVal(n)} = ${formatVal(x)}. ${x===nMinus1?'Found −1 (≡ n−1). Chain is valid — this round passes.': x===1n?`Hit 1 without seeing −1 first! ${formatVal(prev)} is a non-trivial square root of 1 mod ${formatVal(n)}. This is impossible in prime fields → ${formatVal(n)} is COMPOSITE.`: 'Not −1, continue squaring.'}`,
           modpowRows:mpRows, chainNodes:[...chain], roundResults:[], modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1 });
 
-        if (x === n-1 || compositeFound) break;
+        if (x === nMinus1 || compositeFound) break;
       }
+      if (!compositeFound && !foundMinus1) compositeFound = true;
     }
 
     const roundResult = compositeFound ? 'composite' : 'prime';
 
     steps.push({ type:'round_end', line: compositeFound?9:10, phase: compositeFound?'result_comp':'result_prime', s, d, n, a, roundNum:roundIdx+1,
-      explain: compositeFound ? `Round ${roundIdx+1} CONCLUDES: ${n} is COMPOSITE (witness a=${a} detected non-trivial √1).` :
-        `Round ${roundIdx+1} PASSES: witness a=${a} is consistent with ${n} being prime. ${roundIdx+1} round(s) complete — error probability ≤ 4^-${roundIdx+1} = ${Math.pow(4,-(roundIdx+1)).toExponential(2)}.`,
+      explain: compositeFound ? `Round ${roundIdx+1} CONCLUDES: ${formatVal(n)} is COMPOSITE (witness a=${formatVal(a)} detected non-trivial √1).` :
+        `Round ${roundIdx+1} PASSES: witness a=${formatVal(a)} is consistent with ${formatVal(n)} being prime. ${roundIdx+1} round(s) complete — error probability ≤ 4^-${roundIdx+1} = ${Math.pow(4,-(roundIdx+1)).toExponential(2)}.`,
       modpowRows:mpRows, chainNodes:[...chain], roundResults: witnesses.slice(0,roundIdx+1).map((w,i)=>({a:w, result: i<roundIdx?'prime': roundResult})),
       modMultCount:totalModMult, squareCount:totalSquare, roundNum:roundIdx+1,
-      isComposite: compositeFound, finalRound: compositeFound });
+      isComposite: compositeFound, finalRound: compositeFound, compositeWitness: compositeFound ? a : null });
 
-    if (compositeFound) return; // stop early
-  });
+    roundsCompleted = roundIdx + 1;
+    if (compositeFound) { compositeWitness = a; break; }
+  }
+
+  const usedWitnesses = witnesses.slice(0, roundsCompleted || witnesses.length);
+  const isComposite = compositeWitness !== null;
 
   // Final verdict
   const lastStep = steps[steps.length-1];
-  const isComposite = lastStep.isComposite;
-  const fermats = witnesses.map(a => ({ a, pass: fermatTest(n,a) }));
+  const fermats = usedWitnesses.map(a => ({ a, pass: fermatTest(n,a) }));
   steps.push({ type:'verdict', line:10, phase: isComposite?'result_comp':'result_prime', s, d, n,
-    explain: isComposite ? `VERDICT: ${n} is COMPOSITE. Miller-Rabin detected a non-trivial square root of 1.` :
-      `VERDICT: ${n} is PROBABLY PRIME after ${witnesses.length} rounds. Probability of error ≤ 4^-${witnesses.length} = ${Math.pow(4,-witnesses.length).toExponential(2)}.`,
+    explain: isComposite ? `VERDICT: ${formatVal(n)} is COMPOSITE. Miller-Rabin detected a non-trivial square root of 1.` :
+      `VERDICT: ${formatVal(n)} is PROBABLY PRIME after ${usedWitnesses.length} rounds. Probability of error ≤ 4^-${usedWitnesses.length} = ${Math.pow(4,-usedWitnesses.length).toExponential(2)}.`,
     modpowRows:lastStep.modpowRows, chainNodes:lastStep.chainNodes,
-    roundResults: witnesses.map((w,i)=>({a:w, result:isComposite && i===lastStep.roundNum-1?'composite':'prime'})),
+    roundResults: usedWitnesses.map((w,i)=>({a:w, result:isComposite && i===lastStep.roundNum-1?'composite':'prime'})),
     modMultCount:totalModMult, squareCount:totalSquare, roundNum:lastStep.roundNum,
-    isComposite, fermatResults: fermats });
+    isComposite, fermatResults: fermats, compositeWitness });
 
   // UI
   currentStep = -1;
@@ -830,14 +884,15 @@ function renderDecompose(s) {
   const el = document.getElementById('decompDisplay');
   const bits = document.getElementById('decompBits');
   const res = document.getElementById('decompResult');
-  el.innerHTML = `n−1 = <strong style="color:var(--text)">${s.n-1}</strong> = 2<sup>${s.s}</sup> × <strong style="color:var(--green)">${s.d}</strong>`;
+  const nMinus1 = s.n - 1n;
+  el.innerHTML = `n−1 = <strong style="color:var(--text)">${formatVal(nMinus1)}</strong> = 2<sup>${s.s}</sup> × <strong style="color:var(--green)">${formatVal(s.d)}</strong>`;
   el.style.color = 'var(--text2)';
   // Show binary decomposition bits
   const binaryD = (s.d).toString(2);
   bits.innerHTML = Array.from({length:s.s},(_,i)=>`<div class="decomp-bit two">2</div>`).join('') +
     `<span style="color:var(--text3);margin:0 6px;font-size:18px">×</span>` +
     Array.from(binaryD).map(b=>`<div class="decomp-bit odd">${b}</div>`).join('');
-  res.textContent = `s = ${s.s} (powers of 2)   |   d = ${s.d} (odd, binary: ${binaryD})`;
+  res.textContent = `s = ${s.s} (powers of 2)   |   d = ${formatVal(s.d)} (odd, binary: ${binaryD})`;
 }
 
 function renderModpow(s) {
@@ -850,19 +905,20 @@ function renderModpow(s) {
       <td>${row.bit}</td><td>${row.action}</td><td>${row.base}</td><td>${row.result}</td><td>${row.exp}</td>
     </tr>`;
   }).join('');
-  document.getElementById('modpowCaption').innerHTML = `Witness <strong style="color:var(--teal)">a = ${s.a||'—'}</strong>, exponent <strong>d = ${s.d}</strong>, modulus <strong>n = ${s.n}</strong>. Binary of d: <code style="color:var(--yellow)">${(s.d).toString(2)}</code>`;
+  document.getElementById('modpowCaption').innerHTML = `Witness <strong style="color:var(--teal)">a = ${formatMaybe(s.a)}</strong>, exponent <strong>d = ${formatVal(s.d)}</strong>, modulus <strong>n = ${formatVal(s.n)}</strong>. Binary of d: <code style="color:var(--yellow)">${(s.d).toString(2)}</code>`;
 }
 
 function renderChain(s) {
   const wrap = document.getElementById('chainWrap');
   if (!s.chainNodes || !s.chainNodes.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text3)">Run steps to see squaring chain.</span>'; return; }
+  const nMinus1 = s.n - 1n;
   wrap.innerHTML = s.chainNodes.map((node, ni) => {
     const stateClass = {active:'cn-active',pass:'cn-pass',minus1:'cn-minus1',fail:'cn-fail'}[node.state]||'cn-idle';
     return `<div class="chain-node ${stateClass}">
       <div class="cn-exp">${node.exp}</div>
-      <div class="cn-val">${node.val}</div>
-      ${node.val === s.n-1 ? `<div style="font-size:9px;color:var(--teal)">≡ −1 ✓</div>` : ''}
-      ${node.val === 1 && node.state==='pass' ? `<div style="font-size:9px;color:var(--green)">≡ 1 ✓</div>` : ''}
+      <div class="cn-val">${formatVal(node.val)}</div>
+      ${node.val === nMinus1 ? `<div style="font-size:9px;color:var(--teal)">≡ −1 ✓</div>` : ''}
+      ${node.val === 1n && node.state==='pass' ? `<div style="font-size:9px;color:var(--green)">≡ 1 ✓</div>` : ''}
       ${node.state==='fail' ? `<div style="font-size:9px;color:var(--red)">COMPOSITE</div>` : ''}
     </div>${ni < s.chainNodes.length-1 ? '<span class="chain-arrow">→</span>' : ''}`;
   }).join('');
@@ -873,7 +929,7 @@ function renderRounds(s) {
   if (!s.roundResults || !s.roundResults.length) return;
   wrap.innerHTML = s.roundResults.map((r,i) => {
     const cls = r.result==='composite'?'composite':r.result==='prime'?'prime':'testing';
-    return `<span class="round-badge ${cls}">Round ${i+1}: a=${r.a} — ${r.result==='composite'?'COMPOSITE':r.result==='prime'?'Passes':'Testing…'}</span>`;
+    return `<span class="round-badge ${cls}">Round ${i+1}: a=${formatVal(r.a)} — ${r.result==='composite'?'COMPOSITE':r.result==='prime'?'Passes':'Testing…'}</span>`;
   }).join('');
 }
 
@@ -883,14 +939,15 @@ function renderVerdict(s) {
   const cls = s.isComposite ? 'result-box-comp' : 'result-box-prime';
   const icon = s.isComposite ? '✗' : '✓';
   const color = s.isComposite ? 'var(--red)' : 'var(--green)';
+  const witnessLabel = s.isComposite ? formatMaybe(s.compositeWitness) : '—';
   box.className = cls;
-  box.innerHTML = `<div style="font-size:15px;font-weight:700;color:${color};margin-bottom:6px">${icon} ${s.n} is ${s.isComposite?'COMPOSITE':'PROBABLY PRIME'}</div>
-    <div style="font-size:12px;color:var(--text2)">${s.isComposite?`Detected by witness a=${s.chainNodes&&s.chainNodes.length?'—':''}: non-trivial square root of 1 found in squaring chain.`:`Passed all ${s.roundNum} witness rounds. Error probability ≤ 4⁻${s.roundNum} ≈ ${Math.pow(4,-s.roundNum).toExponential(2)}.`}</div>`;
+  box.innerHTML = `<div style="font-size:15px;font-weight:700;color:${color};margin-bottom:6px">${icon} ${formatVal(s.n)} is ${s.isComposite?'COMPOSITE':'PROBABLY PRIME'}</div>
+    <div style="font-size:12px;color:var(--text2)">${s.isComposite?`Detected by witness a=${witnessLabel}: non-trivial square root of 1 found in squaring chain.`:`Passed all ${s.roundNum} witness rounds. Error probability ≤ 4⁻${s.roundNum} ≈ ${Math.pow(4,-s.roundNum).toExponential(2)}.`}</div>`;
 
   // Fermat compare
   if (s.fermatResults) {
     const allFermatPass = s.fermatResults.every(f=>f.pass);
-    document.getElementById('fermatResult').innerHTML = s.fermatResults.map(f=>`a=${f.a}: ${f.pass?'<span style="color:var(--orange)">1 (looks prime)</span>':'<span style="color:var(--red)">≠1 (composite)</span>'}`).join('<br>');
+    document.getElementById('fermatResult').innerHTML = s.fermatResults.map(f=>`a=${formatVal(f.a)}: ${f.pass?'<span style="color:var(--orange)">1 (looks prime)</span>':'<span style="color:var(--red)">≠1 (composite)</span>'}`).join('<br>');
     document.getElementById('mrResult').innerHTML = `${s.isComposite?'<span style="color:var(--red)">COMPOSITE</span>':'<span style="color:var(--green)">PROBABLY PRIME</span>'}${allFermatPass && s.isComposite ? '<br><span style="color:var(--orange);font-size:11px">Fermat failed to detect — Miller-Rabin succeeded ✓</span>':''}`;
   }
 }
@@ -968,40 +1025,66 @@ function resetAll() {
 // RSA DEMO
 // ═══════════════════════════════════════════════════════
 function isProbablyPrime(n, k=10) {
-  if (n < 2) return false; if (n === 2 || n === 3) return true; if (n % 2 === 0) return false;
-  let {s, d} = decompose(n);
-  const witnesses = [2,3,5,7,11,13,17,23,29,31].slice(0,k);
-  for (const a of witnesses) {
-    if (a >= n) continue;
-    let x = modpow(a, d, n);
-    if (x === 1 || x === n-1) continue;
-    let composite = true;
-    for (let r=1;r<s;r++) { x = Number(BigInt(x)*BigInt(x) % BigInt(n)); if (x===n-1){composite=false;break;} }
-    if (composite) return false;
+  const N = BigInt(n);
+  if (N < 2n) return false;
+  if (N === 2n || N === 3n) return true;
+  if (N % 2n === 0n) return false;
+  const {s, d} = decompose(N);
+  const baseWitnesses = [2n,3n,5n,7n,11n,13n,17n,23n,29n,31n];
+  for (let i=0; i<k; i++) {
+    const a = pickWitness(N, i, baseWitnesses);
+    if (a >= N) continue;
+    let x = modpow(a, d, N);
+    if (x === 1n || x === N-1n) continue;
+    let foundMinus1 = false;
+    for (let r=1; r<s; r++) {
+      x = (x * x) % N;
+      if (x === N-1n) { foundMinus1 = true; break; }
+      if (x === 1n) return false;
+    }
+    if (!foundMinus1) return false;
   }
   return true;
 }
 
 function randPrime(bits) {
-  const min = Math.pow(2, bits-1), max = Math.pow(2, bits)-1;
-  let n = min + Math.floor(Math.random()*(max-min));
-  if (n % 2 === 0) n++;
-  while (!isProbablyPrime(n)) { n += 2; if (n > max) n = min+1; if(n%2===0)n++; }
+  const min = 1n << BigInt(bits-1);
+  const max = (1n << BigInt(bits)) - 1n;
+  let n = randomBigIntInRange(min, max);
+  if (n % 2n === 0n) n++;
+  while (!isProbablyPrime(n)) {
+    n += 2n;
+    if (n > max) n = min + 1n;
+    if (n % 2n === 0n) n++;
+  }
   return n;
 }
 
 function rsaGenKeys() {
   const bits = Math.floor(parseInt(document.getElementById('rsaBits').value)/2);
-  const e = parseInt(document.getElementById('rsaE').value);
+  const e = BigInt(parseInt(document.getElementById('rsaE').value));
   const log = document.getElementById('rsaLog');
   log.innerHTML = '<div style="color:var(--teal);font-size:12px">Generating primes via Miller-Rabin…</div>';
   setTimeout(()=>{
-    const p = randPrime(bits); const q = randPrime(bits);
-    const n = p*q; const phi = (p-1)*(q-1);
-    const g = gcd(e, phi);
-    if (g !== 1) { log.innerHTML = `<div style="color:var(--red)">gcd(e=${e}, φ(n)=${phi}) = ${g} ≠ 1. Choose different e.</div>`; return; }
+    let p = 0n, q = 0n, n = 0n, phi = 0n, g = 0n;
+    const maxAttempts = 50;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      p = randPrime(bits);
+      do { q = randPrime(bits); } while (q === p);
+      n = p * q;
+      phi = (p - 1n) * (q - 1n);
+      g = gcd(e, phi);
+      if (g === 1n) break;
+    }
+    if (g !== 1n) {
+      rsaState = {};
+      document.getElementById('btnEncrypt').disabled = true;
+      document.getElementById('btnDecrypt').disabled = true;
+      log.innerHTML = `<div style="color:var(--red)">Unable to find valid primes where gcd(e=${formatVal(e)}, φ(n)) = 1 after ${maxAttempts} attempts.</div>`;
+      return;
+    }
     const d = modInverse(e, phi);
-    rsaState = {p, q, n, phi, e, d};
+    rsaState = {p, q, n, phi, e, d, c: null};
     renderRSA(`<div style="color:var(--green);font-weight:600;margin-bottom:8px">✓ Keys Generated</div>`);
     document.getElementById('btnEncrypt').disabled = false;
     document.getElementById('btnDecrypt').disabled = true;
@@ -1010,35 +1093,48 @@ function rsaGenKeys() {
 
 function rsaEncrypt() {
   if (!rsaState.n) return;
-  const m = parseInt(document.getElementById('rsaM').value);
-  if (m >= rsaState.n) { alert(`Message must be < n=${rsaState.n}`); return; }
-  rsaState.c = modpow(rsaState.e, m, rsaState.n);
-  // Correct order: c = m^e mod n
-  rsaState.c = Number(BigInt(m)**BigInt(rsaState.e) % BigInt(rsaState.n));
-  renderRSA(`<div style="color:var(--accent);font-weight:600;margin-bottom:8px">✓ Encrypted: c = m^e mod n = ${m}^${rsaState.e} mod ${rsaState.n} = ${rsaState.c}</div>`);
+  const mRaw = document.getElementById('rsaM').value;
+  if (!/^\d+$/.test(mRaw)) { alert('Message must be a non-negative integer.'); return; }
+  const m = BigInt(mRaw);
+  if (m >= rsaState.n) { alert(`Message must be < n=${formatVal(rsaState.n)}`); return; }
+  rsaState.c = modpow(m, rsaState.e, rsaState.n);
+  renderRSA(`<div style="color:var(--accent);font-weight:600;margin-bottom:8px">✓ Encrypted: c = m^e mod n = ${formatVal(m)}^${formatVal(rsaState.e)} mod ${formatVal(rsaState.n)} = ${formatVal(rsaState.c)}</div>`);
   document.getElementById('btnDecrypt').disabled = false;
 }
 
 function rsaDecrypt() {
   if (!rsaState.c) return;
-  const recovered = Number(BigInt(rsaState.c)**BigInt(rsaState.d) % BigInt(rsaState.n));
-  renderRSA(`<div style="color:var(--green);font-weight:600;margin-bottom:8px">✓ Decrypted: m = c^d mod n = ${rsaState.c}^${rsaState.d} mod ${rsaState.n} = ${recovered}</div>`);
+  const recovered = modpow(rsaState.c, rsaState.d, rsaState.n);
+  renderRSA(`<div style="color:var(--green);font-weight:600;margin-bottom:8px">✓ Decrypted: m = c^d mod n = ${formatVal(rsaState.c)}^${formatVal(rsaState.d)} mod ${formatVal(rsaState.n)} = ${formatVal(recovered)}</div>`);
 }
 
 function renderRSA(header) {
   const s = rsaState;
   document.getElementById('rsaLog').innerHTML = header + `
-    <div class="rsa-row"><span class="rsa-label">p (prime)</span><span class="rsa-val">${s.p||'—'}</span></div>
-    <div class="rsa-row"><span class="rsa-label">q (prime)</span><span class="rsa-val">${s.q||'—'}</span></div>
-    <div class="rsa-row"><span class="rsa-label">n = p×q</span><span class="rsa-val">${s.n||'—'}</span></div>
-    <div class="rsa-row"><span class="rsa-label">φ(n) = (p−1)(q−1)</span><span class="rsa-val">${s.phi||'—'}</span></div>
-    <div class="rsa-row"><span class="rsa-label">e (public)</span><span class="rsa-val">${s.e||'—'}</span></div>
-    <div class="rsa-row"><span class="rsa-label">d (private, e⁻¹ mod φ)</span><span class="rsa-val">${s.d||'—'}</span></div>
-    ${s.c!=null?`<div class="rsa-row"><span class="rsa-label">ciphertext c</span><span class="rsa-val">${s.c}</span></div>`:''}`;
+    <div class="rsa-row"><span class="rsa-label">p (prime)</span><span class="rsa-val">${formatMaybe(s.p)}</span></div>
+    <div class="rsa-row"><span class="rsa-label">q (prime)</span><span class="rsa-val">${formatMaybe(s.q)}</span></div>
+    <div class="rsa-row"><span class="rsa-label">n = p×q</span><span class="rsa-val">${formatMaybe(s.n)}</span></div>
+    <div class="rsa-row"><span class="rsa-label">φ(n) = (p−1)(q−1)</span><span class="rsa-val">${formatMaybe(s.phi)}</span></div>
+    <div class="rsa-row"><span class="rsa-label">e (public)</span><span class="rsa-val">${formatMaybe(s.e)}</span></div>
+    <div class="rsa-row"><span class="rsa-label">d (private, e⁻¹ mod φ)</span><span class="rsa-val">${formatMaybe(s.d)}</span></div>
+    ${s.c!=null?`<div class="rsa-row"><span class="rsa-label">ciphertext c</span><span class="rsa-val">${formatMaybe(s.c)}</span></div>`:''}`;
 }
 
-function gcd(a,b){while(b){let t=b;b=a%b;a=t;}return a;}
-function modInverse(a,m){let [old_r,r]=[a,m],[old_s,s]=[1,0];while(r!==0){const q=Math.floor(old_r/r);[old_r,r]=[r,old_r-q*r];[old_s,s]=[s,old_s-q*s];}return((old_s%m)+m)%m;}
+function gcd(a,b){
+  let x = BigInt(a), y = BigInt(b);
+  while (y !== 0n) { const t = y; y = x % y; x = t; }
+  return x;
+}
+function modInverse(a,m){
+  let [old_r, r] = [BigInt(a), BigInt(m)];
+  let [old_s, s] = [1n, 0n];
+  while (r !== 0n) {
+    const q = old_r / r;
+    [old_r, r] = [r, old_r - q * r];
+    [old_s, s] = [s, old_s - q * s];
+  }
+  return ((old_s % BigInt(m)) + BigInt(m)) % BigInt(m);
+}
 
 // ═══════════════════════════════════════════════════════
 // UI HELPERS

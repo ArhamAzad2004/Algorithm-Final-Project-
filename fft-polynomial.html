@@ -678,10 +678,11 @@ function fft(re, im, inverse) {
   }
 }
 
-function computeFFT(coeffs, n, inverse) {
+function computeFFT(coeffs, n, inverse, imagCoeffs) {
   const re = new Array(n).fill(0);
   const im = new Array(n).fill(0);
   coeffs.forEach((c,i) => { if(i<n) re[i]=c; });
+  if (imagCoeffs) imagCoeffs.forEach((c,i) => { if(i<n) im[i]=c; });
   fft(re,im,inverse);
   if (inverse) { for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;} }
   return {re, im};
@@ -693,8 +694,13 @@ function computeFFT(coeffs, n, inverse) {
 function buildSteps() {
   const rawA = document.getElementById('inputA').value;
   const rawB = document.getElementById('inputB').value;
-  const A = rawA.split(',').map(Number).filter((_,i,a) => a.slice(0,i+1).every(v=>!isNaN(v)));
-  const B = rawB.split(',').map(Number).filter((_,i,a) => a.slice(0,i+1).every(v=>!isNaN(v)));
+  const partsA = rawA.split(',').map(s => s.trim());
+  const partsB = rawB.split(',').map(s => s.trim());
+  if (!partsA.length || !partsB.length || partsA.some(p => p === '') || partsB.some(p => p === '')) {
+    alert('Please enter valid comma-separated numbers for both polynomials.'); return;
+  }
+  const A = partsA.map(Number);
+  const B = partsB.map(Number);
   if (!A.length || !B.length || A.some(isNaN) || B.some(isNaN)) {
     alert('Please enter valid comma-separated numbers for both polynomials.'); return;
   }
@@ -713,10 +719,7 @@ function buildSteps() {
   const FB = computeFFT(padB, n, false);
   const FCre = FA.re.map((v,i) => v*FB.re[i] - FA.im[i]*FB.im[i]);
   const FCim = FA.re.map((v,i) => v*FB.im[i] + FA.im[i]*FB.re[i]);
-  const C = computeFFT(Array.from(FCre).map((v,i)=>v), n, true);
-  // Compose with imag for IFFT
-  const FCreFull = {re: FCre, im: FCim};
-  const result = FCre.map((v,i)=> { const r={re:FCre[i],im:FCim[i]}; return r; });
+  const C = computeFFT(FCre, n, true, FCim);
   const Ccoeffs = C.re.slice(0, A.length+B.length-1).map(v=>Math.round(v));
 
   // Count butterflies: n/2 * log2(n) per FFT, *3 (FFTA + FFTB + IFFT)
@@ -732,7 +735,6 @@ function buildSteps() {
     const halfSize = size/2;
     const numGroups = n/size;
     for (let g=0; g<Math.min(numGroups,2); g++) {
-      const base = g*size;
       for (let k=0; k<halfSize; k++) {
         const angle = -2*Math.PI*k/size;
         const wr = Math.cos(angle).toFixed(3), wi = Math.sin(angle).toFixed(3);
@@ -770,9 +772,13 @@ function buildSteps() {
   for (let level=0; level<log2n; level++) {
     const size = Math.pow(2, level+1);
     const halfSize = size/2;
-    for (let k=0; k<halfSize; k++) {
-      butterfliesLive++;
-      steps.push({ type:'butterfly_ifft', phase:'ifft', line:15, explain:`IFFT — Level ${level+1}/${log2n}: Butterfly index ${k}. Using ω⁻¹ (conjugate twiddle factors). Same butterfly structure but in reverse direction.`, bf:butterfliesLive, mults:multsLive, pipePhase:2, circleN:n, circleActive:[k], bfLevel:level, bfIdx:k });
+    const numGroups = n/size;
+    for (let g=0; g<Math.min(numGroups,2); g++) {
+      const base = g*size;
+      for (let k=0; k<halfSize; k++) {
+        butterfliesLive++;
+        steps.push({ type:'butterfly_ifft', phase:'ifft', line:15, explain:`IFFT — Level ${level+1}/${log2n}: Butterfly at group ${g}, index ${k}. Using ω⁻¹ (conjugate twiddle factors). Same butterfly structure but in reverse direction.`, bf:butterfliesLive, mults:multsLive, pipePhase:2, circleN:n, circleActive:[k, k+halfSize], bfLevel:level, bfIdx:k });
+      }
     }
   }
   steps.push({ type:'ifft_done', phase:'ifft', line:5, explain:`IFFT complete. Divide each value by n=${n}. Coefficients recovered: [${Ccoeffs.join(', ')}].`, bf:butterfliesLive, mults:multsLive, pipePhase:2, circleN:n, circleActive:[] });
